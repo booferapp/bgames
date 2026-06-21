@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock Paper Scissors - Premium Battle</title>
+
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+</head>
+
+<body class="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top,#1e1b4b_0%,#09090b_60%,#000_100%)] text-slate-100 font-sans p-4 selection:bg-indigo-200">
+    <div class="w-full max-w-lg bg-slate-900/40 backdrop-blur-xl border border-white/5 p-8 rounded-3xl shadow-2xl text-center flex flex-col items-center gap-8">
+        
+        <div class="flex flex-col gap-2">
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500 bg-clip-text text-transparent">Roshambo Clash</h1>
+            <p class="text-slate-400 text-sm">Choose your weapon to defeat the computer.</p>
+        </div>
+
+        <!-- Choice buttons (replaced images) -->
+        <div class="flex gap-4 justify-center w-full">
+            <button id="rock" class="choice-btn w-24 h-24 sm:w-28 sm:h-28 text-5xl bg-amber-500/10 border border-amber-500/20 hover:border-amber-400 hover:bg-amber-500/20 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:-translate-y-1 active:translate-y-0 active:scale-95 shadow-lg shadow-amber-500/5 select-none">
+              ✊
+            </button>
+            <button id="paper" class="choice-btn w-24 h-24 sm:w-28 sm:h-28 text-5xl bg-blue-500/10 border border-blue-500/20 hover:border-blue-400 hover:bg-blue-500/20 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:-translate-y-1 active:translate-y-0 active:scale-95 shadow-lg shadow-blue-500/5 select-none">
+              ✋
+            </button>
+            <button id="scissor" class="choice-btn w-24 h-24 sm:w-28 sm:h-28 text-5xl bg-rose-500/10 border border-rose-500/20 hover:border-rose-400 hover:bg-rose-500/20 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:-translate-y-1 active:translate-y-0 active:scale-95 shadow-lg shadow-rose-500/5 select-none">
+              ✌️
+            </button>
+        </div>
+
+        <!-- Choices Display -->
+        <div class="grid grid-cols-2 gap-4 w-full bg-slate-950/40 p-4 border border-white/5 rounded-2xl">
+            <div class="flex flex-col items-center p-2">
+                <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">Your Choice</span>
+                <span class="user-choice text-lg font-bold text-indigo-400 mt-1 capitalize">NA</span>
+            </div>
+            <div class="flex flex-col items-center p-2">
+                <span class="text-xs uppercase font-semibold text-slate-400 tracking-wider">CPU Choice</span>
+                <span class="computer-choice text-lg font-bold text-purple-400 mt-1 capitalize">NA</span>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div class="min-h-[50px] flex items-center justify-center">
+            <p class="result text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-400 to-yellow-300 bg-clip-text text-transparent px-4">Ready to start...</p>
+        </div>
+
+        <!-- Points Panel -->
+        <div class="grid grid-cols-2 gap-4 w-full">
+            <div class="bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-2xl flex flex-col items-center">
+                <span class="text-xs uppercase font-semibold text-indigo-300/80 tracking-wider">Your Points</span>
+                <span class="user-points text-3xl font-black text-indigo-400 mt-1">0</span>
+            </div>
+            <div class="bg-purple-600/10 border border-purple-500/20 p-4 rounded-2xl flex flex-col items-center">
+                <span class="text-xs uppercase font-semibold text-purple-300/80 tracking-wider">CPU Points</span>
+                <span class="computer-points text-3xl font-black text-purple-400 mt-1">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const imgEls = document.querySelectorAll(".choice-btn");
+      const resultEl = document.querySelector(".result");
+      const userChoiceEl = document.querySelector(".user-choice");
+      const computerChoiceEl = document.querySelector(".computer-choice");
+      const userPointsEl = document.querySelector(".user-points");
+      const computerPointsEl = document.querySelector(".computer-points");
+
+      let userPoints = 0;
+      let computerPoints = 0;
+
+      imgEls.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const computerTurn = computerChoice();
+          const result = gamePlay(btn.id, computerTurn);
+          userChoiceEl.textContent = btn.id;
+          computerChoiceEl.textContent = computerTurn;
+          resultEl.textContent = result;
+        });
+      });
+
+      // Computer randomly pick one choice from the given choices
+      function computerChoice() {
+        const choices = ["rock", "paper", "scissor"];
+        const randomChoice = Math.floor(Math.random() * choices.length);
+        return choices[randomChoice];
+      }
+
+      // it return result by checking user and computer selection
+      function gamePlay(userSelection, computerSelection) {
+        if (userSelection === computerSelection) {
+          return "It is a tie! 🤝";
+        } else if (
+          (userSelection === "rock" && computerSelection === "scissor") ||
+          (userSelection === "paper" && computerSelection === "rock") ||
+          (userSelection === "scissor" && computerSelection === "paper")
+        ) {
+          userPoints++;
+          userPointsEl.textContent = userPoints;
+          return "Hurrah! You win! 🎉";
+        } else {
+          computerPoints++;
+          computerPointsEl.textContent = computerPoints;
+          return "Oops! Computer wins! 💻";
+        }
+      }
+    </script>
+</body>
+</html>

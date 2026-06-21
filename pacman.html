@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pac-Man - Retro Classic</title>
+
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top,#091833_0%,#01010a_60%,#000_100%)] font-sans text-slate-100 p-4 selection:bg-yellow-200 selection:text-slate-900">
+    <div class="w-full max-w-2xl bg-slate-950/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-cyan-950/20">
+      <header class="flex flex-col gap-4 items-center mb-6">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl animate-bounce">🍕</span>
+          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-wider uppercase text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.4)]">Pac-Man</h1>
+        </div>
+        <div class="flex flex-wrap gap-3 justify-center items-center text-sm font-semibold">
+          <div class="bg-black/40 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 backdrop-blur-sm">
+            <span class="text-slate-400">Score:</span>
+            <span id="score" class="text-yellow-400 font-extrabold">0</span>
+          </div>
+          <div class="bg-black/40 px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 backdrop-blur-sm">
+            <span class="text-slate-400">Lives:</span>
+            <span id="lives" class="text-rose-400 font-extrabold">3</span>
+          </div>
+          <button id="restartBtn" class="px-5 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-full shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-150 cursor-pointer">
+            Restart 🔁
+          </button>
+        </div>
+      </header>
+
+      <main class="flex flex-col items-center gap-4">
+        <div class="relative rounded-2xl overflow-hidden border-2 border-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.2)] bg-[#000016]">
+          <canvas id="gameCanvas" width="560" height="620" class="max-w-full h-auto block"></canvas>
+        </div>
+        
+        <!-- Mobile D-pad -->
+        <div class="flex flex-col items-center gap-1.5 mt-2 md:hidden w-full max-w-[160px] select-none">
+          <button id="dpad-up" class="w-12 h-12 flex items-center justify-center bg-slate-800/80 active:bg-yellow-500/80 border border-slate-700 active:border-yellow-400 text-slate-200 active:text-slate-950 font-extrabold rounded-2xl transition-all shadow-lg select-none text-xl">
+            ▲
+          </button>
+          <div class="flex gap-10 justify-between w-full">
+            <button id="dpad-left" class="w-12 h-12 flex items-center justify-center bg-slate-800/80 active:bg-yellow-500/80 border border-slate-700 active:border-yellow-400 text-slate-200 active:text-slate-950 font-extrabold rounded-2xl transition-all shadow-lg select-none text-xl">
+              ◀
+            </button>
+            <button id="dpad-right" class="w-12 h-12 flex items-center justify-center bg-slate-800/80 active:bg-yellow-500/80 border border-slate-700 active:border-yellow-400 text-slate-200 active:text-slate-950 font-extrabold rounded-2xl transition-all shadow-lg select-none text-xl">
+              ▶
+            </button>
+          </div>
+          <button id="dpad-down" class="w-12 h-12 flex items-center justify-center bg-slate-800/80 active:bg-yellow-500/80 border border-slate-700 active:border-yellow-400 text-slate-200 active:text-slate-950 font-extrabold rounded-2xl transition-all shadow-lg select-none text-xl">
+            ▼
+          </button>
+        </div>
+
+        <p class="text-xs sm:text-sm text-slate-400 text-center max-w-md leading-relaxed mt-2">
+          🎮 Use <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200">Arrow Keys</kbd> or <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-200">WASD</kbd> or swipe on screen to move.
+        </p>
+      </main>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const tileSize = 16; 
+      const corridorScale = 1.25; 
+      const corridorTile = Math.round(tileSize * corridorScale); // 20
+      const wallSize = tileSize; // walls stay 16px
+      const cols = 28;
+      const rows = 31;
+
+      canvas.width = cols * corridorTile;
+      canvas.height = rows * corridorTile;
+
+      const scoreEl = document.getElementById("score");
+      const livesEl = document.getElementById("lives");
+      const restartBtn = document.getElementById("restartBtn");
+
+      // 0: empty, 1: wall, 2: pellet, 3: power pellet
+      const levelLayout = [
+        "1111111111111111111111111111",
+        "1222222222112222222222222221",
+        "1211112112112112112111112121",
+        "1311112112112112112111112131",
+        "1222222222222222222222222221",
+        "1211112111112111112111112121",
+        "1222222112222222211222222221",
+        "1111112112111112112111111111",
+        "0000012112110002112110000000",
+        "1111112112111112112111111111",
+        "1222222222222112222222222221",
+        "1211112111112111112111112121",
+        "1222212222222222222222122221",
+        "1111212111110001111122111111",
+        "0000212110000000000122110000",
+        "1111212110111111101122111111",
+        "1222222220222222202222222221",
+        "1211112112111112112111112121",
+        "1222222112222222211222222221",
+        "1111112112111112112111111111",
+        "0000012112110002112110000000",
+        "1111112112111112112111111111",
+        "1222222222222222222222222221",
+        "1211112111112111112111112121",
+        "1311112222222112222222112131",
+        "1222222111112111111122222221",
+        "1111112112222222212111111111",
+        "1222222222112222112222222221",
+        "1211111112112112111111112121",
+        "1222222222222222222222222221",
+        "1111111111111111111111111111",
+      ];
+
+      let map = [];
+      let pelletsRemaining = 0;
+
+      const pacman = {
+        x: 1, 
+        y: 29,
+        dirX: 0,
+        dirY: 0,
+        nextDirX: 0,
+        nextDirY: 0,
+        speed: 8, 
+        radius: tileSize * 0.6,
+      };
+
+      const ghosts = [
+        { x: 13, y: 14, dirX: 1, dirY: 0, color: "#ff4b4b" },
+        { x: 14, y: 14, dirX: -1, dirY: 0, color: "#00e5ff" },
+      ];
+
+      let score = 0;
+      let lives = 3;
+      let gameOver = false;
+      let lastTime = 0;
+      let gameTime = 0; 
+
+      // --- Sound (Web Audio API, no external files) ---
+      let audioCtx = null;
+      let backgroundOsc = null;
+      let backgroundGain = null;
+      let backgroundInterval = null;
+      let backgroundStarted = false;
+
+      function getAudioContext() {
+        if (audioCtx) return audioCtx;
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        audioCtx = new Ctx();
+        return audioCtx;
+      }
+
+      function startBackgroundSound() {
+        if (backgroundStarted) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+          ctx.resume();
+          backgroundOsc = ctx.createOscillator();
+          backgroundGain = ctx.createGain();
+          backgroundOsc.connect(backgroundGain);
+          backgroundGain.connect(ctx.destination);
+          backgroundOsc.type = "sawtooth";
+          backgroundOsc.frequency.setValueAtTime(200, ctx.currentTime);
+          backgroundGain.gain.setValueAtTime(0.04, ctx.currentTime);
+          backgroundOsc.start(ctx.currentTime);
+          backgroundStarted = true;
+          
+          backgroundInterval = setInterval(() => {
+            if (!backgroundOsc || !ctx) return;
+            const t = Date.now() / 1000;
+            const freq = 180 + 130 * Math.sin(t * 0.85);
+            backgroundOsc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.08);
+          }, 80);
+        } catch (_) {}
+      }
+
+      function playPelletSound() {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+          ctx.resume();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "square";
+          osc.frequency.setValueAtTime(680, ctx.currentTime);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.06);
+        } catch (_) {}
+      }
+
+      function playDeathSound() {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        try {
+          ctx.resume();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(220, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.6);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.6);
+        } catch (_) {}
+      }
+
+      function initMap() {
+        map = [];
+        pelletsRemaining = 0;
+        for (let r = 0; r < rows; r++) {
+          const row = [];
+          for (let c = 0; c < cols; c++) {
+            let val = Number(levelLayout[r][c]);
+            if (val === 2 || val === 3) pelletsRemaining++;
+            row.push(val);
+          }
+          map.push(row);
+        }
+      }
+
+      function resetEntities() {
+        pacman.x = 1;
+        pacman.y = 29;
+        pacman.dirX = 0;
+        pacman.dirY = 0;
+        pacman.nextDirX = 0;
+        pacman.nextDirY = 0;
+
+        ghosts[0].x = 13;
+        ghosts[0].y = 14;
+        ghosts[0].dirX = 1;
+        ghosts[0].dirY = 0;
+
+        ghosts[1].x = 14;
+        ghosts[1].y = 14;
+        ghosts[1].dirX = -1;
+        ghosts[1].dirY = 0;
+      }
+
+      function restartGame() {
+        score = 0;
+        lives = 3;
+        gameOver = false;
+        initMap();
+        resetEntities();
+        updateUI();
+      }
+
+      function updateUI() {
+        scoreEl.textContent = score;
+        livesEl.textContent = lives;
+      }
+
+      function isWall(col, row) {
+        if (row < 0 || row >= rows || col < 0 || col >= cols) return true;
+        return map[row][col] === 1;
+      }
+
+      function trySetDirection(dx, dy) {
+        pacman.nextDirX = dx;
+        pacman.nextDirY = dy;
+      }
+
+      function handleInput() {
+        const centerCol = Math.round(pacman.x);
+        const centerRow = Math.round(pacman.y);
+
+        const offsetX = Math.abs(pacman.x - centerCol);
+        const offsetY = Math.abs(pacman.y - centerRow);
+
+        const aligned = offsetX < 0.35 && offsetY < 0.35;
+        const stopped = pacman.dirX === 0 && pacman.dirY === 0;
+
+        if (aligned || stopped) {
+          const targetCol = centerCol + pacman.nextDirX;
+          const targetRow = centerRow + pacman.nextDirY;
+          if (!isWall(targetCol, targetRow)) {
+            pacman.dirX = pacman.nextDirX;
+            pacman.dirY = pacman.nextDirY;
+          }
+        }
+      }
+
+      function movePacman(deltaSeconds) {
+        handleInput();
+
+        const speedPerFrame = pacman.speed * deltaSeconds;
+        let newX = pacman.x + pacman.dirX * speedPerFrame;
+        let newY = pacman.y + pacman.dirY * speedPerFrame;
+
+        // Tunnel wrap
+        if (newX < 0) newX = cols - 1;
+        if (newX > cols - 1) newX = 0;
+
+        const nextCol = Math.round(newX);
+        const nextRow = Math.round(newY);
+
+        if (isWall(nextCol, nextRow)) {
+          const dx = pacman.dirX;
+          const dy = pacman.dirY;
+          pacman.dirX = 0;
+          pacman.dirY = 0;
+          pacman.x = nextCol - dx;
+          pacman.y = nextRow - dy;
+          return;
+        }
+
+        pacman.x = newX;
+        pacman.y = newY;
+
+        // Eat pellets
+        const col = Math.round(pacman.x);
+        const row = Math.round(pacman.y);
+        if (map[row] && (map[row][col] === 2 || map[row][col] === 3)) {
+          playPelletSound();
+          if (map[row][col] === 2) score += 10;
+          if (map[row][col] === 3) score += 50;
+          map[row][col] = 0;
+          pelletsRemaining--;
+          updateUI();
+
+          if (pelletsRemaining <= 0) {
+            gameOver = true;
+            setTimeout(() => alert("You cleared the maze! 🎉"), 100);
+          }
+        }
+      }
+
+      function moveGhost(ghost, deltaSeconds) {
+        const speed = 6 * deltaSeconds;
+        let newX = ghost.x + ghost.dirX * speed;
+        let newY = ghost.y + ghost.dirY * speed;
+
+        const nextCol = Math.round(newX);
+        const nextRow = Math.round(newY);
+
+        if (isWall(nextCol, nextRow)) {
+          const dirs = [
+            { x: 1, y: 0 },
+            { x: -1, y: 0 },
+            { x: 0, y: 1 },
+            { x: 0, y: -1 },
+          ];
+          const currentOppX = -ghost.dirX;
+          const currentOppY = -ghost.dirY;
+
+          const valid = dirs.filter(
+            (d) => !(d.x === currentOppX && d.y === currentOppY)
+          );
+          const choice = valid[Math.floor(Math.random() * valid.length)];
+          ghost.dirX = choice.x;
+          ghost.dirY = choice.y;
+          return;
+        }
+
+        ghost.x = newX;
+        ghost.y = newY;
+
+        // Tunnel wrap
+        if (ghost.x < 0) ghost.x = cols - 1;
+        if (ghost.x > cols - 1) ghost.x = 0;
+      }
+
+      function distance(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      function checkCollisions() {
+        for (const ghost of ghosts) {
+          if (distance(ghost, pacman) < 0.7) {
+            playDeathSound();
+            lives--;
+            updateUI();
+            if (lives <= 0) {
+              gameOver = true;
+              setTimeout(() => alert("Game Over!"), 100);
+            }
+            resetEntities();
+            break;
+          }
+        }
+      }
+
+      function drawMap() {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const val = map[r][c];
+            const x = c * corridorTile;
+            const y = r * corridorTile;
+
+            if (val === 1) {
+              const wallX = x + (corridorTile - wallSize) / 2;
+              const wallY = y + (corridorTile - wallSize) / 2;
+              ctx.fillStyle = "#1e293b";
+              ctx.fillRect(wallX, wallY, wallSize, wallSize);
+              ctx.strokeStyle = "#0ea5e9";
+              ctx.lineWidth = 1.5;
+              ctx.strokeRect(wallX + 1.5, wallY + 1.5, wallSize - 3, wallSize - 3);
+            } else {
+              ctx.fillStyle = "#020617";
+              ctx.fillRect(x, y, corridorTile, corridorTile);
+
+              if (val === 2) {
+                ctx.fillStyle = "#facc15";
+                ctx.beginPath();
+                ctx.arc(
+                  x + corridorTile / 2,
+                  y + corridorTile / 2,
+                  2,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.fill();
+              } else if (val === 3) {
+                ctx.fillStyle = "#facc15";
+                ctx.beginPath();
+                ctx.arc(
+                  x + corridorTile / 2,
+                  y + corridorTile / 2,
+                  4,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.fill();
+              }
+            }
+          }
+        }
+      }
+
+      function drawPacman() {
+        const px = pacman.x * corridorTile + corridorTile / 2;
+        const py = pacman.y * corridorTile + corridorTile / 2;
+
+        const angleOffset =
+          pacman.dirX === 1
+            ? 0
+            : pacman.dirX === -1
+            ? Math.PI
+            : pacman.dirY === -1
+            ? -Math.PI / 2
+            : pacman.dirY === 1
+            ? Math.PI / 2
+            : 0;
+
+        const chompSpeed = 18;
+        const mouthOpen = 0.08 + 0.28 * (0.5 + 0.5 * Math.sin(gameTime * chompSpeed));
+
+        ctx.fillStyle = "#facc15";
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.arc(
+          px,
+          py,
+          corridorTile * 0.65,
+          angleOffset + mouthOpen,
+          angleOffset + Math.PI * 2 - mouthOpen
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function drawGhost(ghost) {
+        const gx = (Math.round(ghost.x) * corridorTile) + corridorTile / 2;
+        const gy = (Math.round(ghost.y) * corridorTile) + corridorTile / 2;
+        const r = corridorTile * 0.65;
+
+        ctx.fillStyle = ghost.color;
+        ctx.beginPath();
+        ctx.arc(gx, gy, r, Math.PI, 0);
+        ctx.lineTo(gx + r, gy + r);
+        ctx.lineTo(gx - r, gy + r);
+        ctx.closePath();
+        ctx.fill();
+
+        // eyes
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(gx - r / 3, gy - r / 4, r / 4, 0, Math.PI * 2);
+        ctx.arc(gx + r / 3, gy - r / 4, r / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(gx - r / 3, gy - r / 4, r / 8, 0, Math.PI * 2);
+        ctx.arc(gx + r / 3, gy - r / 4, r / 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawMap();
+        drawPacman();
+        ghosts.forEach(drawGhost);
+      }
+
+      function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const delta = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+        gameTime = timestamp / 1000;
+
+        if (!gameOver) {
+          movePacman(delta);
+          ghosts.forEach((g) => moveGhost(g, delta));
+          checkCollisions();
+        }
+
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      document.addEventListener("keydown", (e) => {
+        startBackgroundSound();
+        switch (e.key) {
+          case "ArrowUp":
+          case "w":
+          case "W":
+            e.preventDefault();
+            trySetDirection(0, -1);
+            break;
+          case "ArrowDown":
+          case "s":
+          case "S":
+            e.preventDefault();
+            trySetDirection(0, 1);
+            break;
+          case "ArrowLeft":
+          case "a":
+          case "A":
+            e.preventDefault();
+            trySetDirection(-1, 0);
+            break;
+          case "ArrowRight":
+          case "d":
+          case "D":
+            e.preventDefault();
+            trySetDirection(1, 0);
+            break;
+          default:
+            break;
+        }
+      });
+
+      // Swipe Controls
+      let touchStartX = 0;
+      let touchStartY = 0;
+      canvas.addEventListener("touchstart", (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        startBackgroundSound();
+      }, { passive: true });
+
+      canvas.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+      }, { passive: false });
+
+      canvas.addEventListener("touchend", (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const dx = touchEndX - touchStartX;
+        const dy = touchEndY - touchStartY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        
+        if (Math.max(absX, absY) > 30) {
+          if (absX > absY) {
+            if (dx > 0) trySetDirection(1, 0);
+            else trySetDirection(-1, 0);
+          } else {
+            if (dy > 0) trySetDirection(0, 1);
+            else trySetDirection(0, -1);
+          }
+        }
+      }, { passive: true });
+
+      // D-Pad Touch Listeners
+      const dpadUp = document.getElementById("dpad-up");
+      const dpadDown = document.getElementById("dpad-down");
+      const dpadLeft = document.getElementById("dpad-left");
+      const dpadRight = document.getElementById("dpad-right");
+
+      if (dpadUp) {
+        dpadUp.addEventListener("touchstart", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(0, -1); });
+        dpadUp.addEventListener("click", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(0, -1); });
+      }
+      if (dpadDown) {
+        dpadDown.addEventListener("touchstart", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(0, 1); });
+        dpadDown.addEventListener("click", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(0, 1); });
+      }
+      if (dpadLeft) {
+        dpadLeft.addEventListener("touchstart", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(-1, 0); });
+        dpadLeft.addEventListener("click", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(-1, 0); });
+      }
+      if (dpadRight) {
+        dpadRight.addEventListener("touchstart", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(1, 0); });
+        dpadRight.addEventListener("click", (e) => { e.preventDefault(); startBackgroundSound(); trySetDirection(1, 0); });
+      }
+
+      restartBtn.addEventListener("click", () => {
+        startBackgroundSound();
+        restartGame();
+      });
+
+      initMap();
+      resetEntities();
+      updateUI();
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>

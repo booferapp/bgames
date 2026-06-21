@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retro Breakout - Classic Arcade Game</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30">
+    
+    <!-- Glowing decorative light bubbles -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-3xl bg-slate-900/60 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-2xl flex flex-col items-center relative overflow-hidden z-10">
+      
+      <!-- Top HUD Header -->
+      <header class="w-full flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 uppercase drop-shadow-md">
+            Breakout
+          </h1>
+          <p class="text-slate-400 text-xs mt-1">Bounce the ball and break all the blocks</p>
+        </div>
+        <button id="rules-btn" class="py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/5 font-semibold text-xs rounded-xl shadow-md active:scale-95 transition-all cursor-pointer">
+          Show Rules
+        </button>
+      </header>
+
+      <!-- Canvas Block -->
+      <div class="relative w-full flex justify-center bg-slate-950 p-2.5 rounded-2xl border border-slate-800 shadow-inner">
+        <canvas id="canvas" class="block w-full max-w-[800px] bg-slate-950 rounded-xl"></canvas>
+      </div>
+
+      <!-- Mobile Touch Controls -->
+      <div class="flex items-center gap-4 w-full mt-6 justify-between select-none sm:hidden">
+        <button id="btn-left" class="flex-1 py-4 bg-slate-800/80 active:bg-slate-700/80 text-white font-black text-2xl rounded-2xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ◀
+        </button>
+        <button id="btn-right" class="flex-1 py-4 bg-slate-800/80 active:bg-slate-700/80 text-white font-black text-2xl rounded-2xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ▶
+        </button>
+      </div>
+      
+      <div class="hidden sm:block text-center text-xs text-slate-500 mt-4 select-none">
+        Use <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 text-[10px]">◀</kbd> and <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-400 text-[10px]">▶</kbd> arrow keys to slide the paddle
+      </div>
+    </div>
+
+    <!-- Rules Modal dialog -->
+    <div id="rules-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl text-center max-w-sm w-full shadow-2xl relative overflow-hidden transform scale-95 transition-all">
+        <div class="absolute -top-10 -left-10 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl"></div>
+        
+        <h2 class="text-2xl font-black text-white mb-4 uppercase tracking-wide">How To Play</h2>
+        
+        <div class="text-left text-slate-300 text-sm space-y-4 mb-6 leading-relaxed">
+          <p>1. Move the paddle using your keyboard left/right arrow keys (or tap the controls on-screen).</p>
+          <p>2. Bounce the ball upwards to collision-break all blocks.</p>
+          <p>3. If you let the ball fall past the paddle, your score and blocks will reset.</p>
+        </div>
+
+        <button id="close-btn" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg active:scale-[0.98] transition-all cursor-pointer">
+          Got It!
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const rulesButton = document.getElementById("rules-btn");
+      const closeButton = document.getElementById("close-btn");
+      const rulesModal = document.getElementById("rules-modal");
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Custom touch control references
+      const btnLeft = document.getElementById("btn-left");
+      const btnRight = document.getElementById("btn-right");
+
+      // Palette setup
+      const paddleColor = "#38bdf8"; // sky-400
+      const ballColor = "#f59e0b";   // amber-400
+      const brickColors = ["#ef4444", "#f97316", "#eab308", "#10b981", "#06b6d4"]; // Row by row palette
+
+      let score = 0;
+      const brickRowCount = 9;
+      const brickColumnCount = 5;
+
+      const heightRatio = 0.6;
+      canvas.width = 800;
+      canvas.height = canvas.width * heightRatio;
+
+      const ball = {
+        x: canvas.width / 2,
+        y: canvas.height - 40,
+        size: 9,
+        speed: 5.5,
+        dx: 4,
+        dy: -4,
+      };
+
+      const paddle = {
+        x: canvas.width / 2 - 50,
+        y: canvas.height - 25,
+        w: 100,
+        h: 12,
+        speed: 9,
+        dx: 0,
+      };
+
+      const brickInfo = {
+        w: 72,
+        h: 20,
+        padding: 8,
+        offsetX: 42,
+        offsetY: 60,
+        visible: true,
+      };
+
+      const bricks = [];
+      for (let i = 0; i < brickRowCount; i++) {
+        bricks[i] = [];
+        for (let j = 0; j < brickColumnCount; j++) {
+          const x = i * (brickInfo.w + brickInfo.padding) + brickInfo.offsetX;
+          const y = j * (brickInfo.h + brickInfo.padding) + brickInfo.offsetY;
+          bricks[i][j] = { x, y, ...brickInfo };
+        }
+      }
+
+      function drawBall() {
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.size, 0, Math.PI * 2);
+        ctx.fillStyle = ballColor;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddle.x, paddle.y, paddle.w, paddle.h);
+        ctx.fillStyle = paddleColor;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      function drawScore() {
+        ctx.font = 'bold 22px "Outfit"';
+        ctx.fillStyle = "#94a3b8"; // slate-400
+        ctx.fillText(`Score: ${score}`, 40, 35);
+      }
+
+      function drawBricks() {
+        bricks.forEach((column) => {
+          column.forEach((brick, j) => {
+            if (brick.visible) {
+              ctx.beginPath();
+              ctx.rect(brick.x, brick.y, brick.w, brick.h);
+              ctx.fillStyle = brickColors[j % brickColors.length];
+              ctx.fill();
+              ctx.closePath();
+            }
+          });
+        });
+      }
+
+      function draw() {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw scene elements
+        drawBricks();
+        drawBall();
+        drawPaddle();
+        drawScore();
+      }
+
+      function movePaddle() {
+        paddle.x += paddle.dx;
+        if (paddle.x + paddle.w > canvas.width) paddle.x = canvas.width - paddle.w;
+        if (paddle.x < 0) paddle.x = 0;
+      }
+
+      function moveBall() {
+        ball.x += ball.dx;
+        ball.y += ball.dy;
+        
+        // Side wall collisions
+        if (ball.x + ball.size > canvas.width || ball.x - ball.size < 0) {
+          ball.dx *= -1;
+        }
+        
+        // Top wall collision
+        if (ball.y - ball.size < 0) {
+          ball.dy *= -1;
+        }
+        
+        // Paddle collision
+        if (
+          ball.x > paddle.x &&
+          ball.x < paddle.x + paddle.w &&
+          ball.y + ball.size > paddle.y
+        ) {
+          ball.dy = -ball.speed;
+        }
+        
+        // Bricks collision
+        bricks.forEach((column) => {
+          column.forEach((brick) => {
+            if (brick.visible) {
+              if (
+                ball.x - ball.size > brick.x && 
+                ball.x + ball.size < brick.x + brick.w && 
+                ball.y + ball.size > brick.y && 
+                ball.y - ball.size < brick.y + brick.h 
+              ) {
+                ball.dy *= -1;
+                brick.visible = false;
+                increaseScore();
+              }
+            }
+          });
+        });
+        
+        // Game Over reset
+        if (ball.y + ball.size > canvas.height) {
+          showAllBricks();
+          score = 0;
+          resetBall();
+        }
+      }
+
+      function resetBall() {
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.dx = 4;
+        ball.dy = -4;
+      }
+
+      function increaseScore() {
+        score++;
+        // Corrected grid size calculation for reset triggers (9 * 5 = 45)
+        if (score % (brickRowCount * brickColumnCount) === 0) {
+          showAllBricks();
+          resetBall();
+        }
+      }
+
+      function showAllBricks() {
+        bricks.forEach((column) => {
+          column.forEach((brick) => (brick.visible = true));
+        });
+      }
+
+      // Keyboard Controls
+      function keyDown(e) {
+        if (e.key === "Right" || e.key === "ArrowRight") paddle.dx = paddle.speed;
+        else if (e.key === "Left" || e.key === "ArrowLeft") paddle.dx = -paddle.speed;
+      }
+
+      function keyUp(e) {
+        if (
+          e.key === "Right" ||
+          e.key === "ArrowRight" ||
+          e.key === "Left" ||
+          e.key === "ArrowLeft"
+        ) {
+          paddle.dx = 0;
+        }
+      }
+
+      // Mobile Touch Control Events
+      btnLeft.addEventListener("mousedown", () => paddle.dx = -paddle.speed);
+      btnLeft.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        paddle.dx = -paddle.speed;
+      });
+      btnLeft.addEventListener("mouseup", () => paddle.dx = 0);
+      btnLeft.addEventListener("touchend", () => paddle.dx = 0);
+
+      btnRight.addEventListener("mousedown", () => paddle.dx = paddle.speed);
+      btnRight.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        paddle.dx = paddle.speed;
+      });
+      btnRight.addEventListener("mouseup", () => paddle.dx = 0);
+      btnRight.addEventListener("touchend", () => paddle.dx = 0);
+
+      // Modal Triggers
+      rulesButton.addEventListener("click", () => {
+        rulesModal.classList.remove("hidden");
+        rulesModal.classList.add("flex");
+      });
+      closeButton.addEventListener("click", () => {
+        rulesModal.classList.add("hidden");
+        rulesModal.classList.remove("flex");
+      });
+
+      // Main Loop
+      function update() {
+        movePaddle();
+        moveBall();
+        draw();
+        requestAnimationFrame(update);
+      }
+
+      document.addEventListener("keydown", keyDown);
+      document.addEventListener("keyup", keyUp);
+
+      // Start game loop
+      update();
+    </script>
+  </body>
+</html>

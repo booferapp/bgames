@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Retro Tetris - Classic Block Puzzle</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+    
+    <style>
+      /* Glowing Retro Game Cabinet styling */
+      .square {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        box-sizing: border-box;
+        border: 1.5px solid rgba(15, 23, 42, 0.5);
+        box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.35);
+        border-radius: 4px;
+      }
+      
+      .type0 { background-color: #a855f7; } /* Purple T */
+      .type1 { background-color: #06b6d4; } /* Cyan I */
+      .type2 { background-color: #f97316; } /* Orange L */
+      .type3 { background-color: #3b82f6; } /* Blue J */
+      .type4 { background-color: #22c55e; } /* Green S */
+      .type5 { background-color: #ef4444; } /* Red Z */
+      .type6 { background-color: #eab308; } /* Yellow O */
+
+      /* Custom game over styling */
+      .game-over-text {
+        animation: scale-up 0.5s ease-out forwards;
+      }
+      @keyframes scale-up {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+    </style>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30">
+    
+    <!-- Glowing background elements -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-white/5 p-6 rounded-3xl shadow-2xl flex flex-col items-center relative overflow-hidden z-10">
+      
+      <!-- Top HUD Header -->
+      <header class="w-full flex items-center justify-between border-b border-white/5 pb-3 mb-5">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase drop-shadow-md">
+            Tetris
+          </h1>
+          <p class="text-slate-400 text-xs mt-0.5">Stack the lines and beat the high score</p>
+        </div>
+      </header>
+
+      <!-- Main Game Cabinet Panel -->
+      <div id="tetris" class="flex gap-4 w-full justify-center">
+        <!-- Left: Tetris Grid Screen -->
+        <div id="canvas" class="w-[200px] h-[440px] bg-slate-950 border border-slate-800 rounded-xl relative shadow-inner overflow-hidden select-none">
+          <!-- Game Over or Start Screen Overlay inside Canvas -->
+          <div id="canvas-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 p-4 text-center z-20">
+            <h2 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase mb-4">Classic Tetris</h2>
+            <button id="start" class="py-2.5 px-6 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold rounded-xl shadow-lg hover:shadow-purple-500/20 transition-all cursor-pointer text-sm">
+              Start Stacking
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Info Panel HUD -->
+        <div id="info" class="w-[120px] flex flex-col justify-between bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl">
+          <!-- Next Piece Window -->
+          <div>
+            <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-1">Next Piece</span>
+            <div id="next_shape" class="w-20 h-20 bg-slate-950 border border-slate-800/80 rounded-lg relative overflow-hidden flex items-center justify-center"></div>
+          </div>
+
+          <!-- Stats list -->
+          <div class="flex flex-col gap-2.5 my-4">
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block">Score</span>
+              <span id="score" class="text-lg font-black text-purple-400">0</span>
+            </div>
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block">Lines</span>
+              <span id="lines" class="text-lg font-black text-pink-400">0</span>
+            </div>
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block">Level</span>
+              <span id="level" class="text-lg font-black text-cyan-400">1</span>
+            </div>
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block">Time</span>
+              <span id="time" class="text-lg font-black text-slate-200">0</span>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-rose-400/80 font-bold text-center leading-relaxed">
+            Press <kbd class="px-1 bg-slate-800 rounded text-slate-300">Esc</kbd> to Pause
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Touch Controls Layout -->
+      <div class="grid grid-cols-4 gap-2 w-full mt-5 select-none md:hidden max-w-sm">
+        <button id="ctrl-left" class="py-3 bg-slate-800/60 active:bg-slate-700/60 text-white font-bold rounded-xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ◀
+        </button>
+        <button id="ctrl-rotate" class="py-3 bg-slate-800/60 active:bg-slate-700/60 text-white font-bold rounded-xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ↻
+        </button>
+        <button id="ctrl-right" class="py-3 bg-slate-800/60 active:bg-slate-700/60 text-white font-bold rounded-xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ▶
+        </button>
+        <button id="ctrl-down" class="py-3 bg-slate-800/60 active:bg-slate-700/60 text-white font-bold rounded-xl border border-white/5 flex items-center justify-center cursor-pointer select-none">
+          ▼
+        </button>
+      </div>
+
+      <div class="hidden md:block text-center text-xs text-slate-500 mt-4 select-none leading-relaxed">
+        Use Left/Right keys to Slide, Up key to Rotate, and Down key to Drop.
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var isStart = false;
+        var tetrisInstance = null;
+
+        var tetris = {
+          board: [],
+          canvas: null,
+          pSize: 20,
+          canvasHeight: 440,
+          canvasWidth: 200,
+          boardHeight: 0,
+          boardWidth: 0,
+          spawnX: 4,
+          spawnY: 1,
+          shapes: [
+            [[-1, 1], [0, 1], [1, 1], [0, 0]], // TEE
+            [[-1, 0], [0, 0], [1, 0], [2, 0]], // Line
+            [[-1, -1], [-1, 0], [0, 0], [1, 0]], // L
+            [[1, -1], [-1, 0], [0, 0], [1, 0]], // J
+            [[0, -1], [1, -1], [-1, 0], [0, 0]], // S
+            [[-1, -1], [0, -1], [0, 0], [1, 0]], // Z
+            [[0, -1], [1, -1], [0, 0], [1, 0]], // Square
+          ],
+          tempShapes: null,
+          curShape: null,
+          curShapeIndex: null,
+          curX: 0,
+          curY: 0,
+          curSqs: [],
+          nextShape: null,
+          nextShapeDisplay: null,
+          nextShapeIndex: null,
+          sqs: [],
+          score: 0,
+          scoreDisplay: null,
+          level: 1,
+          levelDisplay: null,
+          numLevels: 10,
+          time: 0,
+          maxTime: 1000,
+          timeDisplay: null,
+          isActive: 0,
+          curComplete: false,
+          timer: null,
+          pTimer: null,
+          speed: 700,
+          lines: 0,
+
+          init: function () {
+            isStart = true;
+            this.canvas = document.getElementById("canvas");
+            this.initBoard();
+            this.initInfo();
+            this.initLevelScores();
+            this.initShapes();
+            this.bindKeyEvents();
+            this.play();
+          },
+          initBoard: function () {
+            this.boardHeight = this.canvasHeight / this.pSize;
+            this.boardWidth = this.canvasWidth / this.pSize;
+            var s = this.boardHeight * this.boardWidth;
+            this.board = [];
+            for (var i = 0; i < s; i++) {
+              this.board.push(0);
+            }
+            this.sqs = [];
+          },
+          initInfo: function () {
+            this.nextShapeDisplay = document.getElementById("next_shape");
+            this.levelDisplay = document.getElementById("level");
+            this.timeDisplay = document.getElementById("time");
+            this.scoreDisplay = document.getElementById("score");
+            this.linesDisplay = document.getElementById("lines");
+            this.setInfo("time");
+            this.setInfo("score");
+            this.setInfo("level");
+            this.setInfo("lines");
+          },
+          initShapes: function () {
+            this.curSqs = [];
+            this.curComplete = false;
+            this.shiftTempShapes();
+            this.curShapeIndex = this.tempShapes[0];
+            this.curShape = this.shapes[this.curShapeIndex];
+            this.initNextShape();
+            this.setCurCoords(this.spawnX, this.spawnY);
+            this.drawShape(this.curX, this.curY, this.curShape);
+          },
+          initNextShape: function () {
+            if (typeof this.tempShapes[1] === "undefined") {
+              this.initTempShapes();
+            }
+            try {
+              this.nextShapeIndex = this.tempShapes[1];
+              this.nextShape = this.shapes[this.nextShapeIndex];
+              this.drawNextShape();
+            } catch (e) {
+              console.error("Could not create next shape: " + e);
+            }
+          },
+          initTempShapes: function () {
+            this.tempShapes = [];
+            for (var i = 0; i < this.shapes.length; i++) {
+              this.tempShapes.push(i);
+            }
+            var k = this.tempShapes.length;
+            while (--k) {
+              var j = Math.floor(Math.random() * (k + 1));
+              var tempk = this.tempShapes[k];
+              var tempj = this.tempShapes[j];
+              this.tempShapes[k] = tempj;
+              this.tempShapes[j] = tempk;
+            }
+          },
+          shiftTempShapes: function () {
+            if (typeof this.tempShapes === "undefined" || this.tempShapes === null) {
+              this.initTempShapes();
+            } else {
+              this.tempShapes.shift();
+            }
+          },
+          initTimer: function () {
+            var me = this;
+            var tLoop = function () {
+              me.incTime();
+              me.timer = setTimeout(tLoop, 1000);
+            };
+            this.timer = setTimeout(tLoop, 1000);
+          },
+          initLevelScores: function () {
+            var c = 1;
+            for (var i = 1; i <= this.numLevels; i++) {
+              this["level" + i] = [c * 1000, 40 * i, 5 * i]; 
+              c = c + c;
+            }
+          },
+          setInfo: function (el) {
+            this[el + "Display"].textContent = this[el];
+          },
+          drawNextShape: function () {
+            var ns = [];
+            for (var i = 0; i < this.nextShape.length; i++) {
+              ns[i] = this.createSquare(
+                this.nextShape[i][0] + 1.5,
+                this.nextShape[i][1] + 1.8,
+                this.nextShapeIndex
+              );
+            }
+            this.nextShapeDisplay.innerHTML = "";
+            for (var k = 0; k < ns.length; k++) {
+              this.nextShapeDisplay.appendChild(ns[k]);
+            }
+          },
+          drawShape: function (x, y, p) {
+            for (var i = 0; i < p.length; i++) {
+              var newX = p[i][0] + x;
+              var newY = p[i][1] + y;
+              this.curSqs[i] = this.createSquare(newX, newY, this.curShapeIndex);
+            }
+            for (var k = 0; k < this.curSqs.length; k++) {
+              this.canvas.appendChild(this.curSqs[k]);
+            }
+          },
+          createSquare: function (x, y, type) {
+            var el = document.createElement("div");
+            el.className = "square type" + type;
+            el.style.left = x * this.pSize + "px";
+            el.style.top = y * this.pSize + "px";
+            return el;
+          },
+          removeCur: function () {
+            var me = this;
+            this.curSqs.eachdo(function () {
+              me.canvas.removeChild(this);
+            });
+            this.curSqs = [];
+          },
+          setCurCoords: function (x, y) {
+            this.curX = x;
+            this.curY = y;
+          },
+          bindKeyEvents: function () {
+            var me = this;
+            var event = "keypress";
+            if (this.isSafari() || this.isIE()) {
+              event = "keydown";
+            }
+            var cb = function (e) {
+              me.handleKey(e);
+            };
+            document.addEventListener(event, cb, false);
+          },
+          handleKey: function (e) {
+            var c = this.whichKey(e);
+            if (c === 27) { // Pause toggle
+              this.togglePause();
+              e.preventDefault();
+              return;
+            }
+            if (this.isActive !== 1) return;
+            
+            switch (c) {
+              case 37:
+                this.move("L");
+                e.preventDefault();
+                break;
+              case 38:
+                this.move("RT");
+                e.preventDefault();
+                break;
+              case 39:
+                this.move("R");
+                e.preventDefault();
+                break;
+              case 40:
+                this.move("D");
+                e.preventDefault();
+                break;
+            }
+          },
+          whichKey: function (e) {
+            var c;
+            if (window.event) {
+              c = window.event.keyCode;
+            } else if (e) {
+              c = e.keyCode;
+            }
+            return c;
+          },
+          incTime: function () {
+            this.time++;
+            this.setInfo("time");
+          },
+          incScore: function (amount) {
+            this.score = this.score + amount;
+            this.setInfo("score");
+          },
+          incLevel: function () {
+            this.level++;
+            this.speed = Math.max(100, this.speed - 75);
+            this.setInfo("level");
+          },
+          incLines: function (num) {
+            this.lines += num;
+            this.setInfo("lines");
+          },
+          calcScore: function (args) {
+            var lines = args.lines || 0;
+            var shape = args.shape || false;
+            var score = 0;
+
+            if (lines > 0) {
+              score += lines * this["level" + this.level][1];
+              this.incLines(lines);
+            }
+            if (shape === true) {
+              score += this["level" + this.level][2];
+            }
+            this.incScore(score);
+          },
+          checkScore: function () {
+            if (this.score >= this["level" + this.level][0]) {
+              this.incLevel();
+            }
+          },
+          gameOver: function () {
+            this.clearTimers();
+            isStart = false;
+            
+            // Build Game Over Screen overlay inside canvas
+            var overlay = document.getElementById("canvas-overlay");
+            overlay.innerHTML = `
+              <div class="game-over-text">
+                <h2 class="text-3xl font-black text-rose-500 mb-2 uppercase tracking-wide">Game Over</h2>
+                <p class="text-xs text-slate-400 mb-6">Score reached: <span class="text-purple-400 font-bold">${this.score}</span></p>
+                <button id="start" class="py-2.5 px-6 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer text-sm">
+                  Start Again
+                </button>
+              </div>
+            `;
+            
+            // Re-bind click event to start again
+            var startBtn = overlay.querySelector("#start");
+            startBtn.addEventListener("click", () => {
+              overlay.classList.add("hidden");
+              // Clean canvas shapes
+              document.querySelectorAll(".square").forEach(node => {
+                if (node.parentNode === this.canvas) this.canvas.removeChild(node);
+              });
+              this.init();
+            });
+            
+            overlay.classList.remove("hidden");
+          },
+          play: function () {
+            var me = this;
+            if (this.timer === null) {
+              this.initTimer();
+            }
+            var gameLoop = function () {
+              me.move("D");
+              if (me.curComplete) {
+                me.markBoardShape(me.curX, me.curY, me.curShape);
+                me.curSqs.eachdo(function () {
+                  me.sqs.push(this);
+                });
+                me.calcScore({ shape: true });
+                me.checkRows();
+                me.checkScore();
+                me.initShapes();
+                me.play();
+              } else {
+                me.pTimer = setTimeout(gameLoop, me.speed);
+              }
+            };
+            this.pTimer = setTimeout(gameLoop, me.speed);
+            this.isActive = 1;
+          },
+          togglePause: function () {
+            var overlay = document.getElementById("canvas-overlay");
+            if (this.isActive === 1) {
+              this.clearTimers();
+              this.isActive = 0;
+              
+              overlay.innerHTML = `
+                <div class="game-over-text">
+                  <h2 class="text-3xl font-black text-amber-500 mb-6 uppercase tracking-wide">Paused</h2>
+                  <button id="resume-btn" class="py-2.5 px-6 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer text-sm">
+                    Resume
+                  </button>
+                </div>
+              `;
+              overlay.querySelector("#resume-btn").addEventListener("click", () => this.togglePause());
+              overlay.classList.remove("hidden");
+            } else {
+              overlay.classList.add("hidden");
+              this.play();
+            }
+          },
+          clearTimers: function () {
+            clearTimeout(this.timer);
+            clearTimeout(this.pTimer);
+            this.timer = null;
+            this.pTimer = null;
+          },
+          move: function (dir) {
+            var s = "";
+            var me = this;
+            var tempX = this.curX;
+            var tempY = this.curY;
+            switch (dir) {
+              case "L":
+                s = "left";
+                tempX -= 1;
+                break;
+              case "R":
+                s = "left";
+                tempX += 1;
+                break;
+              case "D":
+                s = "top";
+                tempY += 1;
+                break;
+              case "RT":
+                this.rotate();
+                return true;
+            }
+            
+            if (this.checkMove(tempX, tempY, this.curShape)) {
+              this.curSqs.eachdo(function () {
+                var l = parseInt(this.style[s], 10);
+                dir === "L" ? (l -= me.pSize) : (l += me.pSize);
+                this.style[s] = l + "px";
+              });
+              this.curX = tempX;
+              this.curY = tempY;
+            } else if (dir === "D") {
+              if (this.curY === 1 || this.time === this.maxTime) {
+                this.gameOver();
+                return false;
+              }
+              this.curComplete = true;
+            }
+          },
+          rotate: function () {
+            if (this.curShapeIndex !== 6) { // Square piece does not rotate
+              var temp = [];
+              this.curShape.eachdo(function () {
+                temp.push([this[1] * -1, this[0]]);
+              });
+              if (this.checkMove(this.curX, this.curY, temp)) {
+                this.curShape = temp;
+                this.removeCur();
+                this.drawShape(this.curX, this.curY, this.curShape);
+              }
+            }
+          },
+          checkMove: function (x, y, p) {
+            if (this.isOB(x, y, p) || this.isCollision(x, y, p)) {
+              return false;
+            }
+            return true;
+          },
+          isCollision: function (x, y, p) {
+            var me = this;
+            var bool = false;
+            p.eachdo(function () {
+              var newX = this[0] + x;
+              var newY = this[1] + y;
+              if (me.boardPos(newX, newY) === 1) {
+                bool = true;
+              }
+            });
+            return bool;
+          },
+          isOB: function (x, y, p) {
+            var w = this.boardWidth - 1;
+            var h = this.boardHeight - 1;
+            var bool = false;
+            p.eachdo(function () {
+              var newX = this[0] + x;
+              var newY = this[1] + y;
+              if (newX < 0 || newX > w || newY < 0 || newY > h) {
+                bool = true;
+              }
+            });
+            return bool;
+          },
+          getRowState: function (y) {
+            var c = 0;
+            for (var x = 0; x < this.boardWidth; x++) {
+              if (this.boardPos(x, y) === 1) {
+                c = c + 1;
+              }
+            }
+            if (c === 0) return "E";
+            if (c === this.boardWidth) return "F";
+            return "U";
+          },
+          checkRows: function () {
+            var me = this;
+            var start = this.boardHeight;
+            this.curShape.eachdo(function () {
+              var n = this[1] + me.curY;
+              if (n < start) {
+                start = n;
+              }
+            });
+
+            var c = 0;
+            var stopCheck = false;
+            for (var y = this.boardHeight - 1; y >= 0; y--) {
+              switch (this.getRowState(y)) {
+                case "F":
+                  this.removeRow(y);
+                  c++;
+                  break;
+                case "E":
+                  if (c === 0) {
+                    stopCheck = true;
+                  }
+                  break;
+                case "U":
+                  if (c > 0) {
+                    this.shiftRow(y, c);
+                  }
+                  break;
+              }
+              if (stopCheck === true) {
+                break;
+              }
+            }
+            if (c > 0) {
+              this.calcScore({ lines: c });
+            }
+          },
+          shiftRow: function (y, amount) {
+            var me = this;
+            for (var x = 0; x < this.boardWidth; x++) {
+              this.sqs.eachdo(function () {
+                if (me.isAt(x, y, this)) {
+                  me.setBlock(x, y + amount, this);
+                }
+              });
+            }
+            me.emptyBoardRow(y);
+          },
+          emptyBoardRow: function (y) {
+            for (var x = 0; x < this.boardWidth; x++) {
+              this.markBoardAt(x, y, 0);
+            }
+          },
+          removeRow: function (y) {
+            for (var x = 0; x < this.boardWidth; x++) {
+              this.removeBlock(x, y);
+            }
+          },
+          removeBlock: function (x, y) {
+            var me = this;
+            this.markBoardAt(x, y, 0);
+            this.sqs.eachdo(function (i) {
+              if (me.getPos(this)[0] === x && me.getPos(this)[1] === y) {
+                me.canvas.removeChild(this);
+                me.sqs.splice(i, 1);
+              }
+            });
+          },
+          setBlock: function (x, y, block) {
+            this.markBoardAt(x, y, 1);
+            var newX = x * this.pSize;
+            var newY = y * this.pSize;
+            block.style.left = newX + "px";
+            block.style.top = newY + "px";
+          },
+          isAt: function (x, y, block) {
+            if (this.getPos(block)[0] === x && this.getPos(block)[1] === y) {
+              return true;
+            }
+            return false;
+          },
+          getPos: function (block) {
+            var p = [];
+            p.push(parseInt(block.style.left, 10) / this.pSize);
+            p.push(parseInt(block.style.top, 10) / this.pSize);
+            return p;
+          },
+          getBoardIdx: function (x, y) {
+            return x + y * this.boardWidth;
+          },
+          boardPos: function (x, y) {
+            return this.board[x + y * this.boardWidth];
+          },
+          markBoardAt: function (x, y, val) {
+            this.board[this.getBoardIdx(x, y)] = val;
+          },
+          markBoardShape: function (x, y, p) {
+            var me = this;
+            p.eachdo(function (i) {
+              var newX = p[i][0] + x;
+              var newY = p[i][1] + y;
+              me.markBoardAt(newX, newY, 1);
+            });
+          },
+          isIE: function () { return this.bTest(/IE/); },
+          isFirefox: function () { return this.bTest(/Firefox/); },
+          isSafari: function () { return this.bTest(/Safari/); },
+          bTest: function (rgx) { return rgx.test(navigator.userAgent); }
+        };
+
+        tetrisInstance = tetris;
+
+        // Start button setup
+        const btn = document.querySelector("#start");
+        const overlay = document.getElementById("canvas-overlay");
+        btn.addEventListener("click", function () {
+          overlay.classList.add("hidden");
+          if (!isStart) {
+            tetris.init();
+          }
+        });
+
+        // Mobile Controls setup
+        const bindTouch = (id, action) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener("click", (e) => {
+              e.preventDefault();
+              if (isStart && tetris.isActive === 1) tetris.move(action);
+            });
+            el.addEventListener("touchstart", (e) => {
+              e.preventDefault();
+              if (isStart && tetris.isActive === 1) tetris.move(action);
+            }, { passive: false });
+          }
+        };
+        bindTouch("ctrl-left", "L");
+        bindTouch("ctrl-rotate", "RT");
+        bindTouch("ctrl-right", "R");
+        bindTouch("ctrl-down", "D");
+      })();
+
+      // Helpers
+      if (!Array.prototype.eachdo) {
+        Array.prototype.eachdo = function (fn) {
+          for (var i = 0; i < this.length; i++) {
+            fn.call(this[i], i);
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

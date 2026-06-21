@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Sliding Puzzle</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+
+    <style>
+      .tile-gradient-indigo {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+      }
+      .tile-gradient-emerald {
+        background: linear-gradient(135deg, #059669 0%, #10b981 50%, #06b6d4 100%);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+      }
+      .tile-gradient-sunset {
+        background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #eab308 100%);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+      }
+      .tile {
+        transition: transform 0.12s ease, opacity 0.1s ease;
+      }
+      .tile:hover:not(.empty) {
+        transform: scale(1.03);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+      }
+      .tile:active:not(.empty) {
+        transform: scale(0.96);
+      }
+      #play-panel:not(.hidden) {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30 overflow-x-hidden">
+    
+    <!-- Ambient glowing backgrounds -->
+    <div class="absolute top-10 left-10 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-10 right-10 w-96 h-96 bg-pink-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-lg bg-slate-900/60 backdrop-blur-xl border border-white/5 p-5 md:p-7 rounded-3xl shadow-2xl flex flex-col relative z-10">
+      
+      <!-- Top HUD Header -->
+      <header class="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase drop-shadow-md">
+            Slide Puzzle
+          </h1>
+          <p class="text-slate-400 text-xs mt-0.5">Order the numbers from left to right, top to bottom</p>
+        </div>
+      </header>
+
+      <!-- Level Setup Screen (Initially shown) -->
+      <div id="setup-panel" class="w-full flex flex-col items-center py-4">
+        <span class="text-6xl mb-4">🧩</span>
+        <h2 class="text-lg font-bold text-slate-350 mb-1 uppercase tracking-wider">Select Grid Complexity</h2>
+        <p class="text-xs text-slate-500 mb-6 text-center max-w-[280px]">Choose a grid size to begin your sliding challenge</p>
+        
+        <div class="flex flex-col gap-3 w-full max-w-xs mb-6">
+          <button data-level="easy" class="level-select-btn py-3.5 px-5 bg-slate-950/40 hover:bg-indigo-500/10 hover:border-indigo-500/30 border border-white/5 font-bold rounded-2xl transition-all cursor-pointer text-left flex justify-between items-center group">
+            <div>
+              <span class="block text-sm text-slate-200 font-extrabold group-hover:text-indigo-400">Easy Mode</span>
+              <span class="text-[10px] text-slate-500 block">3x3 Grid &bull; 8 tiles</span>
+            </div>
+            <span class="text-lg">➔</span>
+          </button>
+          <button data-level="medium" class="level-select-btn py-3.5 px-5 bg-slate-950/40 hover:bg-indigo-500/10 hover:border-indigo-500/30 border border-white/5 font-bold rounded-2xl transition-all cursor-pointer text-left flex justify-between items-center group">
+            <div>
+              <span class="block text-sm text-slate-200 font-extrabold group-hover:text-indigo-400">Medium Mode</span>
+              <span class="text-[10px] text-slate-500 block">4x4 Grid &bull; 15 tiles</span>
+            </div>
+            <span class="text-lg">➔</span>
+          </button>
+          <button data-level="hard" class="level-select-btn py-3.5 px-5 bg-slate-950/40 hover:bg-indigo-500/10 hover:border-indigo-500/30 border border-white/5 font-bold rounded-2xl transition-all cursor-pointer text-left flex justify-between items-center group">
+            <div>
+              <span class="block text-sm text-slate-200 font-extrabold group-hover:text-indigo-400">Hard Mode</span>
+              <span class="text-[10px] text-slate-500 block">Expert Grid &bull; 24 tiles</span>
+            </div>
+            <span class="text-lg">➔</span>
+          </button>
+        </div>
+
+        <!-- Custom Theme selection in setup -->
+        <div class="w-full max-w-xs">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2 text-center">Select Theme Color</span>
+          <div class="flex justify-center gap-4">
+            <button id="theme-indigo" class="w-7 h-7 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 border-2 border-white ring-2 ring-indigo-500/20 cursor-pointer" title="Neon Purple"></button>
+            <button id="theme-emerald" class="w-7 h-7 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 border border-white/5 cursor-pointer" title="Emerald Mint"></button>
+            <button id="theme-sunset" class="w-7 h-7 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 border border-white/5 cursor-pointer" title="Sunset Gold"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Play Screen (Initially hidden) -->
+      <div id="play-panel" class="w-full flex-col hidden">
+        <!-- HUD stats -->
+        <div class="grid grid-cols-4 gap-2 mb-4">
+          <div class="bg-slate-950/40 border border-white/5 p-2 rounded-xl text-center">
+            <span class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">Level</span>
+            <span id="badge-level" class="text-xs font-bold text-indigo-400">Easy</span>
+          </div>
+          <div class="bg-slate-950/40 border border-white/5 p-2 rounded-xl text-center">
+            <span class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">Moves</span>
+            <span id="moves-val" class="text-xs font-extrabold text-white">0</span>
+          </div>
+          <div class="bg-slate-950/40 border border-white/5 p-2 rounded-xl text-center">
+            <span class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">Time</span>
+            <span id="time-val" class="text-xs font-extrabold text-cyan-400">0s</span>
+          </div>
+          <div class="bg-slate-950/40 border border-white/5 p-2 rounded-xl text-center">
+            <span class="text-[8px] font-bold text-slate-500 uppercase tracking-widest block">Best</span>
+            <span id="best-val" class="text-xs font-extrabold text-amber-400">--</span>
+          </div>
+        </div>
+
+        <!-- The Sliding Grid Board Container -->
+        <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl shadow-inner flex items-center justify-center min-h-[300px] mb-4">
+          <div id="board" class="grid gap-2 w-full max-w-[340px] aspect-square">
+            <!-- Dynamically populated tiles -->
+          </div>
+        </div>
+
+        <!-- Controls footer buttons -->
+        <div class="flex gap-2">
+          <button id="reset-btn" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-white/5 font-bold rounded-xl text-sm transition-all cursor-pointer">
+            Restart 🔁
+          </button>
+          <button id="exit-btn" class="flex-1 py-3 bg-slate-850 hover:bg-slate-800 active:scale-95 text-slate-350 border border-white/5 font-semibold rounded-xl text-sm transition-all cursor-pointer">
+            Select Level
+          </button>
+        </div>
+      </div>
+
+      <!-- Win Overlay Modal -->
+      <div id="win-overlay" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl text-center max-w-sm w-full shadow-2xl relative overflow-hidden transform scale-95 transition-all">
+          <div class="absolute -top-10 -left-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
+          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 mb-2 uppercase tracking-wide">Solved! 🎉</h2>
+          <p class="text-slate-400 text-sm mb-6">Excellent sliding skills. You completed the grid!</p>
+          
+          <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-slate-950/40 border border-white/5 rounded-2xl py-3">
+              <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Total Moves</span>
+              <span id="win-moves" class="text-2xl font-black text-white">0</span>
+            </div>
+            <div class="bg-slate-950/40 border border-white/5 rounded-2xl py-3">
+              <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Time Taken</span>
+              <span id="win-time" class="text-2xl font-black text-cyan-400">0s</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <button id="win-again" class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-pink-600 hover:from-indigo-400 hover:to-pink-500 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-98 transition-all cursor-pointer">
+              Play Again
+            </button>
+            <button id="win-level" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-all cursor-pointer">
+              Change Grid Level
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide Synth & Logic -->
+    <script>
+      // Sound Synthesizer via Web Audio API
+      let audioCtx = null;
+      function initAudio() {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      function playSound(type) {
+        try {
+          initAudio();
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          const now = audioCtx.currentTime;
+
+          if (type === 'slide') {
+            // Snappy wood-block/thud click
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(250, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+            osc.start(now);
+            osc.stop(now + 0.08);
+          } else if (type === 'win') {
+            // Melodic triplet fanfare
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            notes.forEach((freq, idx) => {
+              const oscN = audioCtx.createOscillator();
+              const gainN = audioCtx.createGain();
+              oscN.connect(gainN);
+              gainN.connect(audioCtx.destination);
+              
+              oscN.type = 'sine';
+              oscN.frequency.setValueAtTime(freq, now + idx * 0.12);
+              gainN.gain.setValueAtTime(0.2, now + idx * 0.12);
+              gainN.gain.linearRampToValueAtTime(0.01, now + idx * 0.12 + 0.25);
+              oscN.start(now + idx * 0.12);
+              oscN.stop(now + idx * 0.12 + 0.25);
+            });
+          }
+        } catch (e) {
+          console.warn("Audio Context failed: ", e);
+        }
+      }
+
+      // State Manager
+      let state = {
+        level: 'easy', // 'easy', 'medium', 'hard'
+        size: 3,
+        grid: [],
+        emptyIndex: 8,
+        moves: 0,
+        seconds: 0,
+        timerInterval: null,
+        activeTheme: 'tile-gradient-indigo'
+      };
+
+      const LEVELS = { easy: 3, medium: 4, hard: 5 };
+
+      // DOM Elements
+      const setupPanel = document.getElementById("setup-panel");
+      const playPanel = document.getElementById("play-panel");
+      const boardElement = document.getElementById("board");
+
+      const badgeLevel = document.getElementById("badge-level");
+      const movesVal = document.getElementById("moves-val");
+      const timeVal = document.getElementById("time-val");
+      const bestVal = document.getElementById("best-val");
+
+      const resetBtn = document.getElementById("reset-btn");
+      const exitBtn = document.getElementById("exit-btn");
+
+      const winOverlay = document.getElementById("win-overlay");
+      const winMoves = document.getElementById("win-moves");
+      const winTime = document.getElementById("win-time");
+      const winAgain = document.getElementById("win-again");
+      const winLevel = document.getElementById("win-level");
+
+      // Theme Buttons
+      const themeIndigo = document.getElementById("theme-indigo");
+      const themeEmerald = document.getElementById("theme-emerald");
+      const themeSunset = document.getElementById("theme-sunset");
+
+      // Event bindings
+      document.querySelectorAll(".level-select-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          initAudio();
+          launchGame(btn.dataset.level);
+        });
+      });
+
+      exitBtn.addEventListener("click", exitToSetup);
+      resetBtn.addEventListener("click", restartGame);
+      
+      winAgain.addEventListener("click", () => {
+        winOverlay.classList.add("hidden");
+        winOverlay.classList.remove("flex");
+        restartGame();
+      });
+      winLevel.addEventListener("click", () => {
+        winOverlay.classList.add("hidden");
+        winOverlay.classList.remove("flex");
+        exitToSetup();
+      });
+
+      // Themes config
+      function setTheme(themeClass, clickedBtn) {
+        state.activeTheme = themeClass;
+        [themeIndigo, themeEmerald, themeSunset].forEach(b => {
+          b.classList.remove("border-white", "ring-2", "ring-indigo-500/20");
+          b.classList.add("border-white/5");
+        });
+        clickedBtn.classList.remove("border-white/5");
+        clickedBtn.classList.add("border-white", "ring-2", "ring-indigo-500/20");
+        if (playPanel.classList.contains("hidden") === false) {
+          renderBoard();
+        }
+      }
+
+      themeIndigo.addEventListener("click", () => setTheme('tile-gradient-indigo', themeIndigo));
+      themeEmerald.addEventListener("click", () => setTheme('tile-gradient-emerald', themeEmerald));
+      themeSunset.addEventListener("click", () => setTheme('tile-gradient-sunset', themeSunset));
+
+      function launchGame(levelName) {
+        state.level = levelName;
+        state.size = LEVELS[levelName];
+        
+        setupPanel.classList.add("hidden");
+        playPanel.classList.remove("hidden");
+
+        badgeLevel.textContent = levelName.charAt(0).toUpperCase() + levelName.slice(1);
+        
+        restartGame();
+      }
+
+      function restartGame() {
+        state.moves = 0;
+        state.seconds = 0;
+        movesVal.textContent = "0";
+        timeVal.textContent = "0s";
+        
+        // Show best record for current grid
+        const bestMoves = localStorage.getItem(`slide_best_${state.level}`);
+        bestVal.textContent = bestMoves ? `${bestMoves} moves` : '--';
+
+        // Setup solvable grid configuration
+        const totalElements = state.size * state.size;
+        
+        // Populate standard solved array
+        let grid = [];
+        for (let i = 1; i < totalElements; i++) grid.push(i);
+        grid.push(0); // 0 acts as space
+
+        state.grid = grid;
+        state.emptyIndex = totalElements - 1;
+
+        // Shuffle with randomized legal sliding moves to guarantee solvability
+        const shuffleSteps = state.level === 'easy' ? 80 : (state.level === 'medium' ? 180 : 350);
+        for (let i = 0; i < shuffleSteps; i++) {
+          const neighbors = getNeighbors(state.emptyIndex, state.size);
+          const randNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+          // Swap empty
+          [state.grid[state.emptyIndex], state.grid[randNeighbor]] = [state.grid[randNeighbor], state.grid[state.emptyIndex]];
+          state.emptyIndex = randNeighbor;
+        }
+
+        renderBoard();
+
+        // Start stopwatch timer
+        clearInterval(state.timerInterval);
+        state.timerInterval = setInterval(() => {
+          state.seconds++;
+          timeVal.textContent = `${state.seconds}s`;
+        }, 1000);
+      }
+
+      function getNeighbors(index, size) {
+        const row = Math.floor(index / size);
+        const col = index % size;
+        const neighbors = [];
+        if (row > 0) neighbors.push(index - size);
+        if (row < size - 1) neighbors.push(index + size);
+        if (col > 0) neighbors.push(index - 1);
+        if (col < size - 1) neighbors.push(index + 1);
+        return neighbors;
+      }
+
+      function renderBoard() {
+        boardElement.innerHTML = "";
+        
+        // Configure grid template columns
+        boardElement.style.gridTemplateColumns = `repeat(${state.size}, minmax(0, 1fr))`;
+        
+        const total = state.size * state.size;
+        for (let i = 0; i < total; i++) {
+          const val = state.grid[i];
+          const cell = document.createElement("div");
+          
+          if (val === 0) {
+            cell.className = "tile empty bg-slate-950 rounded-2xl border border-dashed border-white/5 flex items-center justify-center select-none aspect-square shadow-inner";
+          } else {
+            cell.className = `tile ${state.activeTheme} rounded-2xl flex items-center justify-center font-black text-2xl cursor-pointer select-none aspect-square text-white shadow-md`;
+            cell.textContent = val;
+            
+            // Interaction listeners
+            const slideAction = () => selectTile(i);
+            cell.addEventListener("mousedown", slideAction);
+            cell.addEventListener("touchstart", (e) => {
+              e.preventDefault();
+              slideAction();
+            });
+          }
+          
+          boardElement.appendChild(cell);
+        }
+      }
+
+      function selectTile(index) {
+        const size = state.size;
+        const neighbors = getNeighbors(state.emptyIndex, size);
+        
+        if (neighbors.includes(index)) {
+          // Slide swap
+          [state.grid[state.emptyIndex], state.grid[index]] = [state.grid[index], state.grid[state.emptyIndex]];
+          state.emptyIndex = index;
+          
+          state.moves++;
+          movesVal.textContent = state.moves;
+          
+          playSound('slide');
+          renderBoard();
+          
+          // Check win condition
+          if (checkWin()) {
+            endGameWin();
+          }
+        }
+      }
+
+      function checkWin() {
+        const total = state.size * state.size;
+        for (let i = 0; i < total - 1; i++) {
+          if (state.grid[i] !== i + 1) return false;
+        }
+        return state.grid[total - 1] === 0;
+      }
+
+      function endGameWin() {
+        clearInterval(state.timerInterval);
+        playSound('win');
+
+        // Set best highscore record
+        const bestKey = `slide_best_${state.level}`;
+        const previousBest = localStorage.getItem(bestKey);
+        if (!previousBest || state.moves < parseInt(previousBest)) {
+          localStorage.setItem(bestKey, state.moves);
+        }
+
+        winMoves.textContent = state.moves;
+        winTime.textContent = `${state.seconds}s`;
+
+        winOverlay.classList.remove("hidden");
+        winOverlay.classList.add("flex");
+      }
+
+      function exitToSetup() {
+        clearInterval(state.timerInterval);
+        playPanel.classList.add("hidden");
+        setupPanel.classList.remove("hidden");
+      }
+    </script>
+  </body>
+</html>

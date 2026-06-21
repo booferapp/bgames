@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candy Crush - Premium Edition</title>
+
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="bg-[url('https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/bg.png')] bg-cover bg-center min-h-screen flex flex-col justify-center items-center p-4 selection:bg-pink-200">
+    
+    <!-- Mode Selection Screen -->
+    <div id="modeSelection" class="flex flex-col items-center justify-center bg-white/80 backdrop-blur-xl border border-white/20 p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center transition-all duration-300 transform hover:scale-[1.02]">
+      <div class="w-20 h-20 bg-gradient-to-tr from-pink-500 to-yellow-400 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-500/30 mb-6">
+        <span class="text-4xl">🍬</span>
+      </div>
+      <h2 class="text-3xl font-extrabold text-slate-800 mb-2 tracking-tight">Candy Crush</h2>
+      <p class="text-sm text-slate-500 mb-8">Match 3 or 4 candies of the same color to score points!</p>
+      
+      <div class="flex flex-col gap-4 w-full">
+        <button id="endlessMode" class="w-full py-4 px-6 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold rounded-2xl shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
+          🎮 Endless Mode
+        </button>
+        <button id="timedMode" class="w-full py-4 px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-2xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
+          ⏱️ Timed Mode (2 Mins)
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="flex flex-col lg:flex-row items-center gap-8 max-w-5xl w-full justify-center">
+      
+      <!-- Scoreboard with Timer and Change Mode Button -->
+      <div class="scoreBoard bg-white/90 backdrop-blur-xl border border-white/30 rounded-3xl p-6 shadow-xl flex flex-row lg:flex-col items-center justify-between lg:justify-center gap-6 w-full lg:w-64" style="display: none;">
+        <div class="flex flex-col items-center lg:items-center">
+          <span class="text-xs uppercase tracking-widest font-semibold text-slate-400">Score</span>
+          <h1 id="score" class="text-4xl font-black bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">0</h1>
+        </div>
+        
+        <div id="timer" class="text-lg font-bold text-slate-700 bg-slate-100 px-4 py-2 rounded-xl border border-slate-200/50"></div>
+        
+        <button id="changeMode" class="py-2.5 px-5 bg-slate-800 hover:bg-slate-900 text-white font-medium text-sm rounded-xl shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
+          🔄 Change Mode
+        </button>
+      </div>
+
+      <!-- Game Grid -->
+      <div class="game-grid w-[320px] h-[320px] sm:w-[480px] sm:h-[480px] md:w-[560px] md:h-[560px] bg-slate-950/20 backdrop-blur-md p-2 rounded-3xl shadow-inner border border-white/10 flex flex-wrap" style="display: none;"></div>
+
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          candyCrushGame();
+      });
+
+      function candyCrushGame() {
+          // DOM Elements
+          const grid = document.querySelector(".game-grid");
+          const scoreDisplay = document.getElementById("score");
+          const timerDisplay = document.getElementById("timer");
+          const modeSelection = document.getElementById("modeSelection");
+          const endlessButton = document.getElementById("endlessMode");
+          const timedButton = document.getElementById("timedMode");
+          const changeModeButton = document.getElementById("changeMode");
+
+          // Game State Variables
+          const width = 8;
+          const squares = [];
+          let score = 0;
+          let currentMode = null;
+          let timeLeft = 0;
+          let gameInterval = null;
+          let timerInterval = null;
+
+          const candyColors = [
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/red-candy.png)",
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/blue-candy.png)",
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/green-candy.png)",
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/yellow-candy.png)",
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/orange-candy.png)",
+              "url(https://raw.githubusercontent.com/arpit456jain/Amazing-Js-Projects/master/Candy%20Crush/utils/purple-candy.png)",
+          ];
+
+          // Create the Game Board
+          function createBoard() {
+              grid.innerHTML = ""; // Clear existing grid
+              squares.length = 0;  // Clear squares array
+              for (let i = 0; i < width * width; i++) {
+                  const square = document.createElement("div");
+                  square.setAttribute("draggable", true);
+                  square.setAttribute("id", i);
+                  
+                  // Style dynamically generated squares with Tailwind
+                  square.className = "w-[12.5%] h-[12.5%] bg-cover bg-center rounded-xl transition-all duration-200 hover:scale-[1.08] cursor-grab active:cursor-grabbing p-0.5 sm:p-1 border border-white/5";
+                  
+                  let randomColor = Math.floor(Math.random() * candyColors.length);
+                  square.style.backgroundImage = candyColors[randomColor];
+                  grid.appendChild(square);
+                  squares.push(square);
+              }
+              // Add drag event listeners
+              squares.forEach(square => square.addEventListener("dragstart", dragStart));
+              squares.forEach(square => square.addEventListener("dragend", dragEnd));
+              squares.forEach(square => square.addEventListener("dragover", dragOver));
+              squares.forEach(square => square.addEventListener("dragenter", dragEnter));
+              squares.forEach(square => square.addEventListener("dragleave", dragLeave));
+              squares.forEach(square => square.addEventListener("drop", dragDrop));
+          }
+
+          // Drag and Drop Functions
+          let colorBeingDragged, colorBeingReplaced, squareIdBeingDragged, squareIdBeingReplaced;
+
+          function dragStart() {
+              colorBeingDragged = this.style.backgroundImage;
+              squareIdBeingDragged = parseInt(this.id);
+          }
+
+          // Make the elements highlight during hover/drag enter
+          function dragOver(e) {
+              e.preventDefault();
+          }
+
+          function dragEnter(e) {
+              e.preventDefault();
+              this.classList.add("scale-110", "brightness-110");
+          }
+
+          function dragLeave() {
+              this.classList.remove("scale-110", "brightness-110");
+          }
+
+          function dragDrop() {
+              this.classList.remove("scale-110", "brightness-110");
+              colorBeingReplaced = this.style.backgroundImage;
+              squareIdBeingReplaced = parseInt(this.id);
+              this.style.backgroundImage = colorBeingDragged;
+              squares[squareIdBeingDragged].style.backgroundImage = colorBeingReplaced;
+          }
+
+          function dragEnd() {
+              // Define valid moves (adjacent squares: left, up, right, down)
+              let validMoves = [
+                  squareIdBeingDragged - 1,
+                  squareIdBeingDragged - width,
+                  squareIdBeingDragged + 1,
+                  squareIdBeingDragged + width
+              ];
+              let validMove = validMoves.includes(squareIdBeingReplaced);
+
+              if (squareIdBeingReplaced && validMove) {
+                  squareIdBeingReplaced = null; // Move is valid, keep the swap
+              } else if (squareIdBeingReplaced && !validMove) {
+                  // Invalid move, revert the swap
+                  squares[squareIdBeingReplaced].style.backgroundImage = colorBeingReplaced;
+                  squares[squareIdBeingDragged].style.backgroundImage = colorBeingDragged;
+              } else {
+                  // No drop occurred, revert to original
+                  squares[squareIdBeingDragged].style.backgroundImage = colorBeingDragged;
+              }
+          }
+
+          // Move Candies Down
+          function moveIntoSquareBelow() {
+              // Fill empty squares in the first row
+              for (let i = 0; i < width; i++) {
+                  if (squares[i].style.backgroundImage === "") {
+                      let randomColor = Math.floor(Math.random() * candyColors.length);
+                      squares[i].style.backgroundImage = candyColors[randomColor];
+                  }
+              }
+              // Move candies down to fill gaps
+              for (let i = 0; i < width * (width - 1); i++) {
+                  if (squares[i + width].style.backgroundImage === "") {
+                      squares[i + width].style.backgroundImage = squares[i].style.backgroundImage;
+                      squares[i].style.backgroundImage = "";
+                  }
+              }
+          }
+
+          // Check for Matches
+          function checkRowForFour() {
+              for (let i = 0; i < 60; i++) {
+                  if (i % width >= width - 3) continue; // Skip if not enough columns left
+                  let rowOfFour = [i, i + 1, i + 2, i + 3];
+                  let decidedColor = squares[i].style.backgroundImage;
+                  const isBlank = squares[i].style.backgroundImage === "";
+                  if (rowOfFour.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
+                      score += 4;
+                      scoreDisplay.innerHTML = score;
+                      rowOfFour.forEach(index => squares[index].style.backgroundImage = "");
+                  }
+              }
+          }
+
+          function checkColumnForFour() {
+              for (let i = 0; i < 40; i++) {
+                  let columnOfFour = [i, i + width, i + 2 * width, i + 3 * width];
+                  let decidedColor = squares[i].style.backgroundImage;
+                  const isBlank = squares[i].style.backgroundImage === "";
+                  if (columnOfFour.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
+                      score += 4;
+                      scoreDisplay.innerHTML = score;
+                      columnOfFour.forEach(index => squares[index].style.backgroundImage = "");
+                  }
+              }
+          }
+
+          // Adds match scale animations to matched items
+          function checkRowForThree() {
+              for (let i = 0; i < 62; i++) {
+                  if (i % width >= width - 2) continue; // Skip if not enough columns left
+                  let rowOfThree = [i, i + 1, i + 2];
+                  let decidedColor = squares[i].style.backgroundImage;
+                  const isBlank = squares[i].style.backgroundImage === "";
+                  if (rowOfThree.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
+                      score += 3;
+                      scoreDisplay.innerHTML = score;
+                      rowOfThree.forEach(index => squares[index].style.backgroundImage = "");
+                  }
+              }
+          }
+
+          function checkColumnForThree() {
+              for (let i = 0; i < 48; i++) {
+                  let columnOfThree = [i, i + width, i + 2 * width];
+                  let decidedColor = squares[i].style.backgroundImage;
+                  const isBlank = squares[i].style.backgroundImage === "";
+                  if (columnOfThree.every(index => squares[index].style.backgroundImage === decidedColor && !isBlank)) {
+                      score += 3;
+                      scoreDisplay.innerHTML = score;
+                      columnOfThree.forEach(index => squares[index].style.backgroundImage = "");
+                  }
+              }
+          }
+
+          // Game Loop
+          function gameLoop() {
+              checkRowForFour();
+              checkColumnForFour();
+              checkRowForThree();
+              checkColumnForThree();
+              moveIntoSquareBelow();
+          }
+
+          // Start the Game
+          function startGame(mode) {
+              currentMode = mode;
+              modeSelection.style.display = "none";
+              grid.style.display = "flex";
+              scoreDisplay.parentElement.style.display = "flex"; // Show scoreboard
+              createBoard();
+              score = 0;
+              scoreDisplay.innerHTML = score;
+              gameInterval = setInterval(gameLoop, 100);
+
+              if (mode === "timed") {
+                  timeLeft = 120; // 2 minutes in seconds
+                  updateTimerDisplay();
+                  timerInterval = setInterval(() => {
+                      timeLeft--;
+                      updateTimerDisplay();
+                      if (timeLeft <= 0) {
+                          clearInterval(timerInterval);
+                          endGame();
+                      }
+                  }, 1000);
+              } else {
+                  timerDisplay.style.display = "none"; // Hide timer in Endless Mode
+              }
+          }
+
+          // Update Timer Display
+          function updateTimerDisplay() {
+              if (currentMode === "timed") {
+                  timerDisplay.style.display = "block";
+                  let minutes = Math.floor(timeLeft / 60);
+                  let seconds = timeLeft % 60;
+                  timerDisplay.innerHTML = `⏱️ ${minutes}:${seconds.toString().padStart(2, "0")}`;
+              } else {
+                  timerDisplay.style.display = "none";
+              }
+          }
+
+          // End Game (Timed Mode)
+          function endGame() {
+        if (window.Boofer && Boofer.isAvailable()) {
+          const finalScore = typeof score !== 'undefined' ? score : (typeof finalScore !== 'undefined' ? finalScore : 0);
+          Boofer.gameOver(finalScore);
+        }
+
+              clearInterval(gameInterval);
+              squares.forEach(square => square.setAttribute("draggable", false));
+              alert(`Time's Up! Your score is ${score}`);
+          }
+
+          // Change Mode
+          function changeMode() {
+              clearInterval(gameInterval);
+              if (currentMode === "timed") {
+                  clearInterval(timerInterval);
+              }
+              grid.style.display = "none";
+              scoreDisplay.parentElement.style.display = "none";
+              modeSelection.style.display = "flex"; // Show mode selection screen
+          }
+
+          // Event Listeners
+          endlessButton.addEventListener("click", () => startGame("endless"));
+          timedButton.addEventListener("click", () => startGame("timed"));
+          changeModeButton.addEventListener("click", changeMode);
+      }
+    </script>
+  </body>
+</html>

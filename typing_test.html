@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Type - Typing Challenge</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30">
+    
+    <!-- Glowing background elements -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-lg bg-slate-900/60 backdrop-blur-xl border border-white/5 p-6 md:p-8 rounded-3xl shadow-2xl flex flex-col items-center relative overflow-hidden z-10">
+      <div class="absolute -top-10 -left-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
+
+      <!-- Top HUD Header -->
+      <header class="text-center mb-6 w-full border-b border-white/5 pb-3">
+        <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-teal-400 uppercase drop-shadow-md">
+          Typing Challenge
+        </h1>
+        <p class="text-slate-400 text-xs mt-1">Type the displayed phrase as accurately as possible</p>
+      </header>
+
+      <!-- Target Phrase Display -->
+      <div class="w-full bg-slate-950/40 p-5 border border-slate-800 rounded-2xl mb-4 relative shadow-inner">
+        <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Challenge Phrase</span>
+        <div id="main-display" class="text-lg md:text-xl font-bold text-slate-200 tracking-wide select-none leading-relaxed min-h-[50px]">
+          Press "Start" to draw your phrase...
+        </div>
+      </div>
+
+      <!-- Typing Area Container -->
+      <div class="w-full relative mb-6">
+        <textarea 
+          id="typing-area" 
+          placeholder="Phrase input slot..."
+          disabled
+          class="typingArea w-full h-32 bg-slate-950/40 border border-slate-850 focus:border-indigo-500 text-white rounded-2xl p-4 focus:outline-none transition-all duration-300 shadow-inner focus:shadow-indigo-500/10 resize-none font-semibold placeholder-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        ></textarea>
+        
+        <!-- Live character tracker -->
+        <span id="char-counter" class="absolute bottom-3 right-4 text-[10px] text-slate-500 font-bold tracking-wider">
+          0 characters
+        </span>
+      </div>
+
+      <!-- Actions -->
+      <button id="action-btn" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-500 hover:to-teal-500 active:scale-[0.98] text-white font-bold rounded-2xl shadow-lg transition-all cursor-pointer">
+        Start
+      </button>
+    </div>
+
+    <!-- Results Toast Modal -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl text-center max-w-sm w-full shadow-2xl relative overflow-hidden transform scale-95 transition-all">
+        <div class="absolute -top-10 -left-10 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl"></div>
+        <h2 class="text-3xl font-black text-teal-400 mb-4 uppercase tracking-wide">Finished! ⏱️</h2>
+        
+        <div class="flex flex-col gap-4 mb-6">
+          <div class="bg-slate-950/40 border border-white/5 rounded-2xl py-3 flex-1">
+            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Speed</span>
+            <span id="modal-time" class="text-2xl font-black text-white">0s</span>
+          </div>
+          <div class="bg-slate-950/40 border border-white/5 rounded-2xl py-3 flex-1">
+            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Accuracy Score</span>
+            <span id="modal-score" class="text-2xl font-black text-indigo-400">0 / 0</span>
+          </div>
+        </div>
+
+        <button id="modal-restart" class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-teal-600 hover:from-indigo-400 hover:to-teal-500 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all cursor-pointer">
+          Challenge Again
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const mainDisplay = document.getElementById("main-display");
+      const typeArea = document.getElementById("typing-area");
+      const btn = document.getElementById("action-btn");
+      const charCounter = document.getElementById("char-counter");
+      
+      const resultModal = document.getElementById("result-modal");
+      const modalTime = document.getElementById("modal-time");
+      const modalScore = document.getElementById("modal-score");
+      const modalRestart = document.getElementById("modal-restart");
+
+      const words = [
+        "A day in the life of a programmer",
+        "What is JavaScript?",
+        "What is React?",
+        "What is a Programming Language?",
+        "What's your name?",
+        "Where are you from?",
+        "This is just a random phrase",
+        "What is Remix.js?",
+        "New Technologies are emerging rapidly",
+        "Is programming hard?",
+        "Why do you want to become a programmer?",
+        "Which programming language do you like the most?",
+        "What is Golang and why do you want to learn it?",
+        "What is CSS and how is it useful"
+      ];
+
+      const game = {
+        start: 0,
+        end: 0,
+        user: "",
+        arrText: "",
+      };
+
+      btn.addEventListener("click", () => {
+        if (btn.textContent === "Start" || btn.textContent === "Play Again") {
+          play();
+          typeArea.value = "";
+          typeArea.disabled = false;
+          typeArea.focus();
+        } else if (btn.textContent === "Done") {
+          typeArea.disabled = true;
+          end();
+        }
+      });
+
+      modalRestart.addEventListener("click", () => {
+        resultModal.classList.add("hidden");
+        resultModal.classList.remove("flex");
+        play();
+        typeArea.value = "";
+        typeArea.disabled = false;
+        typeArea.focus();
+      });
+
+      // Update character counter live on typing
+      typeArea.addEventListener("input", () => {
+        const count = typeArea.value.length;
+        charCounter.textContent = `${count} character${count === 1 ? "" : "s"}`;
+      });
+
+      // Intercept Enter key to trigger Done button
+      typeArea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault(); // Prevent adding new lines
+          if (btn.textContent === "Done") {
+            btn.click();
+          }
+        }
+      });
+
+      function play() {
+        let randText = Math.floor(Math.random() * words.length);
+        mainDisplay.textContent = words[randText];
+        game.arrText = words[randText];
+        btn.textContent = "Done";
+        charCounter.textContent = "0 characters";
+        
+        const duration = new Date();
+        game.start = duration.getTime(); 
+      }
+
+      function end() {
+        const duration = new Date();
+        game.end = duration.getTime();
+        
+        const totalTime = ((game.end - game.start) / 1000).toFixed(2);
+        game.user = typeArea.value;
+        const correct = results();
+
+        // Update modal results
+        modalTime.textContent = `${totalTime}s`;
+        modalScore.textContent = `${correct.score} / ${correct.total}`;
+        
+        // Show Win Modal
+        resultModal.classList.remove("hidden");
+        resultModal.classList.add("flex");
+        
+        btn.textContent = "Start";
+        mainDisplay.textContent = "Challenge completed! Press Start to reload another phrase.";
+      }
+
+      function results() {
+        let valueOne = game.arrText.split(" ");
+        let valueTwo = game.user.split(" ");
+        let score = 0;
+        
+        valueOne.forEach((word, idx) => {
+          if (valueTwo[idx] && word.toLowerCase() === valueTwo[idx].toLowerCase()) {
+            score++;
+          }
+        });
+
+        return { score, total: valueOne.length };
+      }
+    </script>
+  </body>
+</html>

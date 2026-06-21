@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Whack-A-Mole</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+
+    <style>
+      .hole {
+        position: relative;
+        overflow: hidden;
+      }
+      /* Mole slides up and down */
+      .mole {
+        position: absolute;
+        bottom: -100%;
+        left: 0;
+        right: 0;
+        margin: auto;
+        width: 65%;
+        height: 80%;
+        transition: bottom 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 2;
+      }
+      .hole.up .mole {
+        bottom: 25px; /* Slide up, resting behind the dirt overlay */
+      }
+      .dirt-overlay {
+        position: absolute;
+        bottom: -5px;
+        left: 0;
+        width: 100%;
+        height: 50px;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .hole-rim {
+        position: absolute;
+        bottom: 15px;
+        left: 10%;
+        width: 80%;
+        height: 25px;
+        background: #09090b;
+        border: 2.5px solid #6366f1;
+        border-radius: 50%;
+        z-index: 1;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+      }
+      #gameover-overlay:not(.hidden) {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30 overflow-x-hidden">
+    
+    <!-- Ambient glowing backgrounds -->
+    <div class="absolute top-1/4 left-1/4 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-pink-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-xl bg-slate-900/60 backdrop-blur-xl border border-white/5 p-6 md:p-8 rounded-3xl shadow-2xl flex flex-col relative z-10">
+      
+      <!-- Top Header HUD -->
+      <header class="flex items-center justify-between border-b border-white/5 pb-4 mb-5">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase drop-shadow-md">
+            Neon Whack
+          </h1>
+          <p class="text-slate-400 text-xs mt-0.5">Whack the golden hamsters before time runs out!</p>
+        </div>
+      </header>
+
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-3 gap-3 mb-5">
+        <div class="bg-slate-950/40 border border-white/5 p-3 rounded-2xl text-center">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Score</span>
+          <span id="score-val" class="text-2xl font-black text-indigo-400">0</span>
+        </div>
+        <div class="bg-slate-950/40 border border-white/5 p-3 rounded-2xl text-center">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Time Left</span>
+          <span id="time-val" class="text-2xl font-black text-pink-400">15</span>
+        </div>
+        <div class="bg-slate-950/40 border border-white/5 p-3 rounded-2xl text-center">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Best</span>
+          <span id="high-val" class="text-2xl font-black text-amber-400">0</span>
+        </div>
+      </div>
+
+      <!-- Play Arena -->
+      <div class="relative w-full">
+        <!-- Hole Grid -->
+        <div id="game-grid" class="grid grid-cols-3 gap-y-8 gap-x-4 bg-slate-950/60 border border-slate-800 p-6 rounded-2xl shadow-inner min-h-[280px]">
+          <!-- Populate 6 holes in JS -->
+        </div>
+
+        <!-- Overlays -->
+        <!-- Start screen overlay -->
+        <div id="start-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 rounded-2xl p-6 text-center z-20">
+          <span class="text-6xl mb-4 animate-pulse">🐹</span>
+          <h2 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 uppercase tracking-wider mb-2">Whack-A-Mole</h2>
+          <p class="text-slate-400 text-xs max-w-xs mb-6">Test your reflexes! Tap the hamsters as they pop out of the neon pits. You have 15 seconds.</p>
+          <button id="start-btn" class="w-full max-w-[200px] py-3 bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer">
+            Start Whacking
+          </button>
+        </div>
+
+        <!-- Game Over Modal Overlay -->
+        <div id="gameover-overlay" class="absolute inset-0 flex-col items-center justify-center bg-slate-950/95 rounded-2xl p-6 text-center z-20 hidden">
+          <span class="text-6xl mb-4">👾</span>
+          <h2 class="text-3xl font-black text-rose-500 uppercase tracking-wider mb-1">Session Ended</h2>
+          <p class="text-slate-400 text-sm mb-4">Let's check your score</p>
+          
+          <div class="bg-slate-900/60 border border-white/5 py-3 px-6 rounded-2xl mb-6 min-w-[160px]">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Whacks</span>
+            <span id="final-score" class="text-4xl font-extrabold text-white">0</span>
+          </div>
+
+          <button id="restart-btn" class="w-full max-w-[200px] py-3 bg-gradient-to-r from-indigo-500 to-pink-500 hover:from-indigo-400 hover:to-pink-400 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer">
+            Play Again
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer Control Options -->
+      <footer class="mt-5 flex gap-3 border-t border-white/5 pt-4">
+        <button id="stop-btn" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-semibold border border-white/5 rounded-xl transition-all cursor-pointer text-sm hidden">
+          Quit Game
+        </button>
+      </footer>
+    </div>
+
+    <!-- Web Audio Synth Logic -->
+    <script>
+      // Sound Synthesizer via Web Audio API
+      let audioCtx = null;
+      function initAudio() {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      function playSound(type) {
+        try {
+          initAudio();
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          const now = audioCtx.currentTime;
+
+          if (type === 'bonk') {
+            // Wood block mallet sound
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(350, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.12);
+            gain.gain.setValueAtTime(0.6, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+            osc.start(now);
+            osc.stop(now + 0.15);
+          } else if (type === 'start') {
+            // Siren sweep
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.linearRampToValueAtTime(700, now + 0.3);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+          } else if (type === 'gameover') {
+            // Sad sweep
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.linearRampToValueAtTime(150, now + 0.6);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+            osc.start(now);
+            osc.stop(now + 0.6);
+          }
+        } catch (e) {
+          console.warn("Audio Context failed: ", e);
+        }
+      }
+
+      // Populate 6 holes inside game-grid
+      const gameGrid = document.getElementById("game-grid");
+      for (let i = 1; i <= 6; i++) {
+        // Dirt overlay represents mounds
+        const holeDiv = document.createElement("div");
+        holeDiv.className = "hole h-28 flex flex-col items-center justify-end";
+        
+        holeDiv.innerHTML = `
+          <div class="hole-rim"></div>
+          <div class="mole flex items-center justify-center text-5xl cursor-pointer select-none">
+            🐹
+          </div>
+          <div class="dirt-overlay">
+            <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="w-full h-full">
+              <path d="M 0,30 Q 50,0 100,30 Z" fill="#1e1b4b" stroke="#312e81" stroke-width="2"/>
+            </svg>
+          </div>
+        `;
+        
+        gameGrid.appendChild(holeDiv);
+      }
+
+      // Query elements
+      const holes = document.querySelectorAll(".hole");
+      const moles = document.querySelectorAll(".mole");
+      const scoreVal = document.getElementById("score-val");
+      const timeVal = document.getElementById("time-val");
+      const highVal = document.getElementById("high-val");
+
+      const startOverlay = document.getElementById("start-overlay");
+      const gameoverOverlay = document.getElementById("gameover-overlay");
+      const finalScore = document.getElementById("final-score");
+
+      const startBtn = document.getElementById("start-btn");
+      const restartBtn = document.getElementById("restart-btn");
+      const stopBtn = document.getElementById("stop-btn");
+
+      let score = 0;
+      let timeLeft = 15;
+      let playing = false;
+      let lastHole = null;
+      let peepTimer = null;
+      let countdownTimer = null;
+
+      // Load highscore
+      let highScore = parseInt(localStorage.getItem("whack_highscore")) || 0;
+      highVal.textContent = highScore;
+
+      // Setup mole click/touch bindings
+      moles.forEach(mole => {
+        const bonkHandler = (e) => {
+          if (!e.isTrusted) return; // Prevent bot scripts
+          if (!playing) return;
+          
+          const parent = mole.parentElement;
+          if (parent.classList.contains("up")) {
+            score++;
+            scoreVal.textContent = score;
+            parent.classList.remove("up");
+            playSound('bonk');
+
+            // Float points feedback
+            showFloatingText(parent, "+1", "text-indigo-400");
+          }
+        };
+
+        mole.addEventListener("mousedown", bonkHandler);
+        mole.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          bonkHandler(e);
+        });
+      });
+
+      startBtn.addEventListener("click", startGame);
+      restartBtn.addEventListener("click", startGame);
+      stopBtn.addEventListener("click", resetGame);
+
+      function randomTime(min, max) {
+        return Math.round(Math.random() * (max - min) + min);
+      }
+
+      function randomHole() {
+        const idx = Math.floor(Math.random() * holes.length);
+        const hole = holes[idx];
+        if (hole === lastHole) {
+          return randomHole();
+        }
+        lastHole = hole;
+        return hole;
+      }
+
+      function peep() {
+        if (!playing) return;
+
+        // Mole remains up for a duration scaling with current score (faster as score grows)
+        const minPeep = Math.max(250, 450 - score * 8);
+        const maxPeep = Math.max(450, 850 - score * 12);
+        const time = randomTime(minPeep, maxPeep);
+        
+        const hole = randomHole();
+        hole.classList.add("up");
+
+        peepTimer = setTimeout(() => {
+          hole.classList.remove("up");
+          
+          // Delay before next mole peeps
+          const delay = randomTime(150, 450);
+          peepTimer = setTimeout(peep, delay);
+        }, time);
+      }
+
+      function startGame() {
+        initAudio();
+        playSound('start');
+
+        score = 0;
+        timeLeft = 15;
+        playing = true;
+
+        scoreVal.textContent = score;
+        timeVal.textContent = timeLeft;
+
+        startOverlay.classList.add("hidden");
+        gameoverOverlay.classList.add("hidden");
+        stopBtn.classList.remove("hidden");
+
+        // Start peep loop
+        peep();
+
+        // Start countdown timer
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(() => {
+          timeLeft--;
+          timeVal.textContent = timeLeft;
+          if (timeLeft <= 0) {
+            endGame();
+          }
+        }, 1000);
+      }
+
+      function showFloatingText(element, text, colorClass) {
+        const floating = document.createElement("div");
+        floating.className = `absolute pointer-events-none text-sm font-black uppercase tracking-wider transition-all duration-500 opacity-100 translate-y-0 ${colorClass} z-10`;
+        floating.textContent = text;
+        floating.style.left = "40%";
+        floating.style.top = "10%";
+        element.appendChild(floating);
+        
+        setTimeout(() => {
+          floating.style.opacity = "0";
+          floating.style.transform = "translateY(-20px)";
+        }, 10);
+
+        setTimeout(() => {
+          floating.remove();
+        }, 500);
+      }
+
+      function endGame() {
+        if (window.Boofer && Boofer.isAvailable()) {
+          const finalScore = typeof score !== 'undefined' ? score : (typeof finalScore !== 'undefined' ? finalScore : 0);
+          Boofer.gameOver(finalScore);
+        }
+
+        playing = false;
+        clearInterval(countdownTimer);
+        clearTimeout(peepTimer);
+        playSound('gameover');
+
+        holes.forEach(h => h.classList.remove("up"));
+
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem("whack_highscore", highScore);
+          highVal.textContent = highScore;
+        }
+
+        finalScore.textContent = score;
+        gameoverOverlay.classList.remove("hidden");
+        stopBtn.classList.add("hidden");
+      }
+
+      function resetGame() {
+        playing = false;
+        clearInterval(countdownTimer);
+        clearTimeout(peepTimer);
+        
+        holes.forEach(h => h.classList.remove("up"));
+
+        scoreVal.textContent = "0";
+        timeVal.textContent = "15";
+
+        startOverlay.classList.remove("hidden");
+        gameoverOverlay.classList.add("hidden");
+        stopBtn.classList.add("hidden");
+      }
+    </script>
+  </body>
+</html>

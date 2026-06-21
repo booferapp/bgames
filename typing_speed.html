@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Boofer SDK Integration -->
+    <meta name="boofer-api-key" content="bfr_dev_d7e0327101141c96acaf822a95b4a29b">
+    <script src="boofer-sdk.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        if (window.Boofer) {
+          Boofer.ready().then(() => Boofer.initGame())
+            .then((info) => console.log("Boofer Init:", info))
+            .catch((err) => console.warn("Boofer SDK offline:", err));
+        }
+      });
+
+      // Universal Boofer Monitor for scores and game-over events
+      (function() {
+        let lastReportedScore = -1;
+        let gameOverReported = false;
+        
+        setInterval(() => {
+          if (!window.Boofer || !Boofer.isAvailable()) return;
+          
+          // 1. Resolve current score
+          let currentScore = 0;
+          if (typeof score === 'number') currentScore = score;
+          else if (typeof points === 'number') currentScore = points;
+          else if (typeof level === 'number') currentScore = level;
+          else if (typeof state === 'object' && state !== null && typeof state.moves === 'number') currentScore = state.moves;
+          else if (typeof moves === 'number') currentScore = moves;
+          else {
+            const scoreEl = document.getElementById("score") || document.getElementById("scoreValue") || document.getElementById("scoreEl") || document.getElementById("score-val");
+            if (scoreEl) {
+              const val = parseInt(scoreEl.textContent || scoreEl.innerText);
+              if (!isNaN(val)) currentScore = val;
+            }
+          }
+          
+          // Report score if increased
+          if (currentScore > lastReportedScore) {
+            lastReportedScore = currentScore;
+            Boofer.saveScore(currentScore).catch(() => {});
+          }
+          
+          // 2. Resolve game-over state
+          let isOver = false;
+          if (typeof gameOver === 'boolean' && gameOver === true) isOver = true;
+          if (typeof timeUp === 'boolean' && timeUp === true) isOver = true;
+          if (typeof playing === 'boolean' && playing === false && lastReportedScore > 0) isOver = true;
+          
+          // Check common game-over UI overlays
+          const goOverlay = document.getElementById("gameOverOverlay") || 
+                            document.getElementById("game-over") || 
+                            document.getElementById("winModal") || 
+                            document.getElementById("win-modal") || 
+                            document.getElementById("gameover-overlay") ||
+                            document.getElementById("winOverlay");
+                            
+          if (goOverlay && !goOverlay.classList.contains("hidden") && goOverlay.style.display !== "none" && lastReportedScore >= 0) {
+            isOver = true;
+          }
+          
+          if (isOver) {
+            if (!gameOverReported) {
+              gameOverReported = true;
+              Boofer.gameOver(lastReportedScore >= 0 ? lastReportedScore : 0).catch(() => {});
+            }
+          } else {
+            gameOverReported = false;
+          }
+        }, 500);
+      })();
+    </script>
+    <!-- End Boofer SDK Integration -->
+
+    
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Typer - Speed Word Typer</title>
+    <link rel="icon" href="https://i.ibb.co/M6KTWnf/pic.jpg" />
+    
+    <!-- Google Font & Tailwind & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Outfit', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 selection:bg-indigo-500/30">
+    
+    <!-- Glowing background bubbles -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="w-full max-w-md bg-slate-900/60 backdrop-blur-xl border border-white/5 p-6 md:p-8 rounded-3xl shadow-2xl flex flex-col items-center relative overflow-hidden z-10">
+      <div class="absolute -top-10 -left-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl"></div>
+
+      <!-- Settings Dropdown Drawer (Sliding down) -->
+      <div id="settings" class="absolute top-0 left-0 right-0 bg-slate-950/90 border-b border-white/5 p-4 flex items-center justify-center gap-4 transition-transform duration-300 -translate-y-full z-25">
+        <form id="settings-form" class="flex items-center gap-3">
+          <label for="difficulty" class="text-xs uppercase tracking-wider font-bold text-slate-400">Difficulty:</label>
+          <select id="difficulty" class="bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer">
+            <option value="easy">Easy (Adds 5s)</option>
+            <option value="medium">Medium (Adds 3s)</option>
+            <option value="hard">Hard (Adds 2s)</option>
+          </select>
+        </form>
+      </div>
+
+      <!-- Top HUD Header -->
+      <header class="w-full flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+        <div>
+          <h1 class="text-3xl font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-teal-400 uppercase drop-shadow-md">
+            Speed Typer
+          </h1>
+          <p class="text-slate-400 text-xs mt-1">Type the words before the timer runs out</p>
+        </div>
+        <button id="settings-btn" class="w-9 h-9 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-white/5 cursor-pointer transition-colors z-30">
+          <i class="fas fa-cog"></i>
+        </button>
+      </header>
+
+      <!-- Live Score / Timer HUD -->
+      <div class="grid grid-cols-2 gap-4 w-full mb-6">
+        <div class="bg-slate-950/40 border border-white/5 py-2.5 px-4 rounded-2xl flex flex-col items-center">
+          <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">Time Left</span>
+          <span id="time" class="text-xl font-extrabold text-teal-400">10s</span>
+        </div>
+        <div class="bg-slate-950/40 border border-white/5 py-2.5 px-4 rounded-2xl flex flex-col items-center">
+          <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-0.5">Score</span>
+          <span id="score" class="text-xl font-extrabold text-indigo-400">0</span>
+        </div>
+      </div>
+
+      <!-- Active Guess Word Panel -->
+      <div class="text-center w-full flex flex-col items-center gap-4 mb-6">
+        <small class="text-[10px] text-slate-500 font-bold uppercase tracking-widest block">Type the following word:</small>
+        <h2 id="word" class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-teal-200 tracking-wide select-none drop-shadow-md min-h-[40px]">
+          sigh
+        </h2>
+        
+        <input
+          type="text"
+          id="text"
+          autocomplete="off"
+          placeholder="Type the word here..."
+          class="bg-slate-950/40 border-2 border-slate-800 focus:border-indigo-500 text-white rounded-2xl p-4 text-center font-bold text-lg w-full max-w-[280px] focus:outline-none transition-all duration-300 shadow-inner focus:shadow-indigo-500/10"
+        />
+      </div>
+    </div>
+
+    <!-- Game Over Modal dialog overlay -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50 animate-fade-in">
+      <div class="bg-slate-900 border border-white/10 p-8 rounded-3xl text-center max-w-sm w-full shadow-2xl relative overflow-hidden transform scale-95 transition-all">
+        <div class="absolute -top-10 -left-10 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl"></div>
+        <h2 class="text-3xl font-black text-rose-500 mb-2 uppercase tracking-wide">Time Out! ⏰</h2>
+        <p class="text-slate-400 text-sm mb-6">The clock ran out of ticks. Ready to guess again?</p>
+        
+        <div class="bg-slate-950/40 border border-white/5 rounded-2xl py-3 mb-6">
+          <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">Words Typed</span>
+          <span id="modal-score" class="text-3xl font-black text-white">0</span>
+        </div>
+
+        <button id="modal-restart" class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-teal-600 hover:from-indigo-400 hover:to-teal-500 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all cursor-pointer">
+          Play Again
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const wordEl = document.getElementById("word");
+      const textEl = document.getElementById("text");
+      const scoreEl = document.getElementById("score");
+      const timeEl = document.getElementById("time");
+      
+      const settingsButton = document.getElementById("settings-btn");
+      const settingsEl = document.getElementById("settings");
+      const settingsForm = document.getElementById("settings-form");
+      const difficultySelect = document.getElementById("difficulty");
+      
+      const winModal = document.getElementById("win-modal");
+      const modalScore = document.getElementById("modal-score");
+      const modalRestart = document.getElementById("modal-restart");
+
+      const words = [
+        "sigh", "tense", "airplane", "ball", "pies", "juice", "warlike", 
+        "bad", "north", "dependent", "steer", "silver", "highfalutin", 
+        "superficial", "quince", "eight", "feeble", "admit", "drag", "loving"
+      ];
+
+      let randomWord;
+      let score = 0;
+      let time = 10;
+      let timeInterval = null;
+      let difficulty = localStorage.getItem("difficulty") || "medium";
+
+      // Toggle settings slide drawer
+      settingsButton.addEventListener("click", () => {
+        settingsEl.classList.toggle("-translate-y-full");
+      });
+
+      settingsForm.addEventListener("change", (e) => {
+        difficulty = e.target.value;
+        localStorage.setItem("difficulty", difficulty);
+        resetGame();
+      });
+
+      modalRestart.addEventListener("click", () => {
+        winModal.classList.add("hidden");
+        winModal.classList.remove("flex");
+        resetGame();
+      });
+
+      function resetGame() {
+        score = 0;
+        time = 10;
+        scoreEl.textContent = "0";
+        timeEl.textContent = "10s";
+        
+        addWordToDom();
+        textEl.value = "";
+        textEl.disabled = false;
+        textEl.focus();
+
+        if (timeInterval) clearInterval(timeInterval);
+        timeInterval = setInterval(updateTime, 1000);
+      }
+
+      function getRandomWord() {
+        return words[Math.floor(Math.random() * words.length)];
+      }
+
+      function addWordToDom() {
+        randomWord = getRandomWord();
+        wordEl.textContent = randomWord;
+      }
+
+      function updateScore() {
+        score++;
+        scoreEl.textContent = score;
+      }
+
+      function updateTime() {
+        time--;
+        timeEl.textContent = time + "s";
+        if (time <= 0) {
+          clearInterval(timeInterval);
+          gameOver();
+        }
+      }
+
+      function gameOver() {
+        if (window.Boofer && Boofer.isAvailable()) {
+          const finalScore = typeof score !== 'undefined' ? score : (typeof finalScore !== 'undefined' ? finalScore : 0);
+          Boofer.gameOver(finalScore);
+        }
+
+        textEl.disabled = true;
+        modalScore.textContent = score;
+        winModal.classList.remove("hidden");
+        winModal.classList.add("flex");
+      }
+
+      textEl.addEventListener("input", (e) => {
+        const insertedText = e.target.value.trim().toLowerCase();
+        
+        if (insertedText === randomWord) {
+          e.target.value = "";
+          addWordToDom();
+          updateScore();
+          
+          // Add seconds based on difficulty selection
+          if (difficulty === "hard") time += 2;
+          else if (difficulty === "medium") time += 3;
+          else time += 5;
+          
+          // Fixed bug: Update HUD manually to avoid double time decrement calls
+          timeEl.textContent = time + "s";
+        }
+      });
+
+      // Init Startup
+      difficultySelect.value = difficulty;
+      resetGame();
+    </script>
+  </body>
+</html>
