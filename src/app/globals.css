@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+:root {
+  --bg-color: #000000;
+  --text-color: #ffffff;
+  --text-muted: #737373;
+  --border-color: #141414;
+  --border-muted: #1a1a1a;
+  --card-bg: #0a0a0a;
+  --card-bg-hover: #111111;
+  --input-bg: #080808;
+  --button-bg: #ffffff;
+  --button-text: #000000;
+  --accent-color: #e5e5e5;
+  --accent-muted: #2a2a2a;
+  --nav-bg: rgba(0,0,0,0.85);
+  --footer-text: #333333;
+}
+
+html.light, :root.light {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --text-muted: #737373;
+  --border-color: #e5e5e5;
+  --border-muted: #f5f5f5;
+  --card-bg: #fafafa;
+  --card-bg-hover: #f0f0f0;
+  --input-bg: #f9f9f9;
+  --button-bg: #000000;
+  --button-text: #ffffff;
+  --accent-color: #1a1a1a;
+  --accent-muted: #e5e5e5;
+  --nav-bg: rgba(255,255,255,0.85);
+  --footer-text: #888888;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  * { margin: 0; padding: 0; }
+
+  html {
+    background: var(--bg-color);
+    color: var(--text-color);
+    transition: background 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  pre, code {
+    font-family: var(--font-geist-mono), monospace;
+  }
+
+  ::selection {
+    background: var(--text-color);
+    color: var(--bg-color);
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-color); }
+  ::-webkit-scrollbar-thumb { background: var(--border-color); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  :focus-visible {
+    outline: 1px solid rgba(255,255,255,0.4);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* A reliable centering container */
+  .container-base {
+    width: 100%;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  /* Code display block */
+  .code-block {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-color);
+    padding: 16px 20px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* Footer links hover utility */
+  .footer-link {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .footer-link:hover {
+    color: var(--text-color);
+  }
+  /* Nav links hover utility */
+  .nav-link {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .nav-link:hover {
+    color: var(--text-color);
+  }
+  /* Primary button hover utility */
+  .btn-primary {
+    display: inline-block;
+    background: var(--button-bg);
+    color: var(--button-text);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 22px;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  /* Hero button hover utility */
+  .btn-hero {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 16px 40px;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+    border: 1px solid var(--border-color);
+  }
+  .btn-hero:hover {
+    opacity: 0.9;
+  }
+}
+
+/* Theme adaptation utility overrides */
+.bg-black {
+  background-color: var(--bg-color) !important;
+}
+.bg-neutral-950 {
+  background-color: var(--input-bg) !important;
+}
+.text-white {
+  color: var(--text-color) !important;
+}
+.border-neutral-900, .border-neutral-800 {
+  border-color: var(--border-color) !important;
+}
+.bg-neutral-900 {
+  background-color: var(--card-bg-hover) !important;
+}
+.bg-neutral-900\/50 {
+  background-color: var(--card-bg) !important;
+}
+.text-neutral-500 {
+  color: var(--text-muted) !important;
+}
+.hover\:text-neutral-200:hover {
+  color: var(--text-color) !important;
+}
+.bg-\[\#000\] {
+  background-color: var(--bg-color) !important;
+}
+.text-neutral-600 {
+  color: var(--text-muted) !important;
+}
+.hover\:text-white:hover {
+  color: var(--text-color) !important;
+}
+
+/* Fancy background pattern */
+.fancy-bg {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0),
+    linear-gradient(to bottom, var(--bg-color), var(--bg-color));
+  background-size: 40px 40px, 100% 100%;
+  transition: background 0.3s ease;
+}
+html.light .fancy-bg, :root.light .fancy-bg {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.05) 1px, transparent 0),
+    linear-gradient(to bottom, var(--bg-color), var(--bg-color));
+  background-size: 40px 40px, 100% 100%;
+}
+
+/* Fancy soft radial glow in the center */
+.fancy-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  transition: background 0.3s ease;
+}
+html.light .fancy-glow, :root.light .fancy-glow {
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.02) 0%, transparent 70%);
+}
