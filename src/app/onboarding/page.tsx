@@ -141,8 +141,37 @@ export default function OnboardingPage() {
                   supabase.from('profiles').select('is_validated, is_verified, recovery_email').eq('id', user.id).single(),
                   supabase.from('boofer_developers').select('status, api_key').eq('user_id', user.id).single()
                 ])
-                setProfile(profileRes.data)
-                setDeveloper(devRes.data)
+
+                const profileData = profileRes.data
+                let devData = devRes.data
+
+                // If profile is verified and has recovery email, but developer row does not exist or is not active,
+                // automatically register the developer via RPC here!
+                if (profileData?.is_verified && profileData?.recovery_email && (!devData || devData.status !== 'active')) {
+                  console.log('User is verified with email but not registered as developer, registering...')
+                  const { data: newDev, error: registerError } = await supabase.rpc('register_developer', { p_user_id: user.id })
+                  if (!registerError && newDev) {
+                    const devRow = Array.isArray(newDev) ? newDev[0] : newDev
+                    if (devRow) {
+                      devData = devRow
+                    }
+                  }
+                }
+
+                setProfile(profileData)
+                setDeveloper(devData)
+
+                const isVerified = profileData?.is_verified
+                const hasEmail = !!profileData?.recovery_email
+                const devStatus = devData?.status
+
+                if (isVerified && devStatus === 'active' && hasEmail) {
+                  // Already a developer! Redirect straight to the dashboard console
+                  setTimeout(() => {
+                    router.push('/dashboard')
+                  }, 1000)
+                  return
+                }
               }
 
               setTimeout(() => {
