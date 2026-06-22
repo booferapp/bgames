@@ -27,6 +27,14 @@ export default function OnboardingPage() {
   // Clipboard & Exporter state
   const [copied, setCopied] = useState(false)
   const [sessionStatus, setSessionStatus] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
+
+  const resetSession = () => {
+    setSessionId(null)
+    setSessionApproved(false)
+    setAuthError(null)
+    setSessionStatus(null)
+  }
 
 
 
@@ -104,36 +112,49 @@ export default function OnboardingPage() {
 
           if (step === 1 && updated.status === 'approved' && updated.access_token && updated.refresh_token) {
             setSessionApproved(true)
+            setAuthError(null)
 
-            const { error: sessionError } = await supabase.auth.setSession({
-              access_token: updated.access_token,
-              refresh_token: updated.refresh_token,
-            })
+            try {
+              const { error: sessionError } = await supabase.auth.setSession({
+                access_token: updated.access_token,
+                refresh_token: updated.refresh_token,
+              })
 
-            if (sessionError) {
-              console.error('Failed to establish session:', sessionError)
-              return
+              if (sessionError) {
+                console.error('Failed to establish session:', sessionError)
+                setSessionApproved(false)
+                setAuthError(
+                  'Failed to establish developer session. Your mobile app session might be stale or invalid. Please sign out and log back in on the Boofer mobile app, then regenerate this QR code and try scanning again.'
+                )
+                return
+              }
+
+              // Clean up tokens in database
+              await supabase
+                .from('web_auth_sessions')
+                .update({ access_token: null, refresh_token: null })
+                .eq('id', sessionId)
+
+              const { data: { user } } = await supabase.auth.getUser()
+              if (user) {
+                const [profileRes, devRes] = await Promise.all([
+                  supabase.from('profiles').select('is_validated, is_verified, recovery_email').eq('id', user.id).single(),
+                  supabase.from('boofer_developers').select('status, api_key').eq('user_id', user.id).single()
+                ])
+                setProfile(profileRes.data)
+                setDeveloper(devRes.data)
+              }
+
+              setTimeout(() => {
+                setStep(2)
+              }, 1000)
+            } catch (err: any) {
+              console.error('Error establishing session:', err)
+              setSessionApproved(false)
+              setAuthError(
+                'Failed to establish developer session. Your mobile app session might be stale or invalid. Please sign out and log back in on the Boofer mobile app, then regenerate this QR code and try scanning again.'
+              )
             }
-
-            // Clean up tokens in database
-            await supabase
-              .from('web_auth_sessions')
-              .update({ access_token: null, refresh_token: null })
-              .eq('id', sessionId)
-
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-              const [profileRes, devRes] = await Promise.all([
-                supabase.from('profiles').select('is_validated, is_verified, recovery_email').eq('id', user.id).single(),
-                supabase.from('boofer_developers').select('status, api_key').eq('user_id', user.id).single()
-              ])
-              setProfile(profileRes.data)
-              setDeveloper(devRes.data)
-            }
-
-            setTimeout(() => {
-              setStep(2)
-            }, 1000)
           }
         }
       )
@@ -531,7 +552,33 @@ export default function OnboardingPage() {
                     </div>
                   )}
 
-                  {sessionApproved ? (
+                  {authError ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '360px', marginTop: '10px' }}>
+                      <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgb(239, 68, 68)', borderRadius: '6px' }}>
+                        <p style={{ fontSize: '12px', color: '#f87171', fontWeight: 500, textAlign: 'center', lineHeight: 1.4 }}>
+                          {authError}
+                        </p>
+                      </div>
+                      <button
+                        onClick={resetSession}
+                        style={{
+                          background: 'var(--button-bg)',
+                          color: 'var(--button-text)',
+                          border: 'none',
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          transition: 'opacity 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
+                        onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                      >
+                        Regenerate QR Code
+                      </button>
+                    </div>
+                  ) : sessionApproved ? (
                     <p style={{ fontSize: '13px', color: '#22c55e', fontWeight: 600 }} className="animate-pulse">
                       ✓ Approval Received! Access granted...
                     </p>
