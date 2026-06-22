@@ -20,14 +20,14 @@ const docItems = [
   { href: '/docs/faq', label: 'FAQ' },
 ]
 
-export function DashboardSidebar() {
+export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-56 bg-[#000] border-r border-neutral-900 flex flex-col z-40">
+    <aside className="h-full w-56 bg-[#000] border-r border-neutral-900 flex flex-col z-40">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-neutral-900">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" onClick={onClose} className="flex items-center gap-2.5">
           <img 
             src="/assets/images/cg-new-b-games.svg" 
             alt="Boofer Games" 
@@ -50,6 +50,7 @@ export function DashboardSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
                   'flex items-center gap-2.5 px-2 py-2 text-sm rounded-none w-full mb-0.5',
                   isActive
@@ -71,6 +72,7 @@ export function DashboardSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className="flex items-center gap-2.5 px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-200 mb-0.5"
             >
               <span className="w-1 h-1 rounded-full bg-neutral-700 flex-shrink-0" />
@@ -85,6 +87,7 @@ export function DashboardSidebar() {
         <Link
           href="https://booferapp.github.io"
           target="_blank"
+          onClick={onClose}
           className="flex items-center gap-2 px-2 py-1.5 text-xs text-neutral-600 hover:text-neutral-400"
         >
           <ExternalLink size={11} />

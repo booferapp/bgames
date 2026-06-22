@@ -442,10 +442,10 @@ export default function OnboardingPage() {
       <div className="fancy-glow" />
       <PublicNavbar />
 
-      <div className="container-base" style={{ marginTop: '100px', marginBottom: '60px', flex: 1, display: 'flex', gap: '40px', position: 'relative', zIndex: 10 }}>
+      <div className="container-base flex flex-col lg:flex-row" style={{ marginTop: '100px', marginBottom: '60px', flex: 1, gap: '40px', position: 'relative', zIndex: 10 }}>
         
         {/* LEFT SIDEBAR: Indicators */}
-        <aside style={{ width: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <aside className="w-full lg:w-[260px] flex flex-col gap-6" style={{ flexShrink: 0 }}>
           <div style={{ paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-color)' }}>Onboarding Checklist</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Complete these steps to unlock the console</p>
@@ -490,14 +490,13 @@ export default function OnboardingPage() {
         </aside>
 
         {/* MAIN PANEL & RIGHT-SIDE STATUS */}
-        <main style={{ flex: 1, display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
+        <main className="flex-1 flex flex-col lg:flex-row gap-8 items-start w-full">
           
           {/* Main Onboarding Wizard Card */}
-          <div style={{
+          <div className="p-5 sm:p-10 w-full" style={{
             flex: 1,
             background: 'var(--card-bg)',
             border: '1px solid var(--border-color)',
-            padding: '40px',
             minHeight: '440px',
             display: 'flex',
             flexDirection: 'column',
@@ -561,7 +560,7 @@ export default function OnboardingPage() {
                     <label style={{ fontSize: '11px', color: 'var(--text-color)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>
                       Game Genres (Select all that apply)
                     </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {GENRES.map(g => {
                         const selected = selectedGenres.includes(g)
                         return (
@@ -853,7 +852,7 @@ export default function OnboardingPage() {
                   </div>
 
                   {/* Actions Row */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       onClick={() => downloadKey('txt')}
                       style={{
@@ -895,14 +894,10 @@ export default function OnboardingPage() {
                   </div>
 
                   {/* SDK Downloader Card */}
-                  <div style={{
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{
                     border: '1px solid var(--border-color)',
                     background: 'var(--input-bg)',
                     padding: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
                     marginTop: '10px'
                   }}>
                     <div>
@@ -921,7 +916,8 @@ export default function OnboardingPage() {
                         textDecoration: 'none',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        justifyContent: 'center'
                       }}
                     >
                       <Download size={12} /> Download SDK
@@ -954,7 +950,7 @@ export default function OnboardingPage() {
           </div>
 
           {/* RIGHT SIDE PANEL: Real-time status / errors */}
-          <div style={{
+          <div className="w-full lg:w-[280px]" style={{
             width: '280px',
             background: 'var(--card-bg)',
             border: '1px solid var(--border-color)',

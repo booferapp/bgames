@@ -59,7 +59,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
           {/* Heading */}
           <h1 style={{
-            fontSize: 'clamp(44px, 7vw, 72px)',
+            fontSize: 'clamp(32px, 7vw, 72px)',
             fontWeight: 800,
             lineHeight: 1.05,
             letterSpacing: '-0.03em',
@@ -110,18 +110,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* ─── Features ─────────────────────────── */}
       <section style={{ borderTop: '1px solid var(--border-color)', position: 'relative', zIndex: 10 }}>
         <div className="container-base" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            border: '1px solid var(--border-color)',
-            background: 'var(--card-bg)',
-          }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 border border-neutral-900 bg-neutral-900/50">
             {features.map((f, i) => (
               <div
                 key={f.title}
+                className="border-b md:border-b-0 md:border-r border-neutral-900 last:border-0"
                 style={{
                   padding: '32px 28px',
-                  borderRight: i < features.length - 1 ? '1px solid var(--border-color)' : 'none',
                 }}
               >
                 <span style={{
@@ -149,7 +144,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       {/* ─── Docs CTA ─────────────────────────── */}
       <section style={{ borderTop: '1px solid var(--border-color)', position: 'relative', zIndex: 10 }}>
         <div className="container-base" style={{ paddingTop: '60px', paddingBottom: '60px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px', flexWrap: 'wrap' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-color)', marginBottom: '6px' }}>
                 Read the documentation
@@ -170,7 +165,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       {/* ─── Footer ───────────────────────────── */}
       <footer style={{ borderTop: '1px solid var(--border-color)', position: 'relative', zIndex: 10, background: 'var(--bg-color)' }}>
-        <div className="container-base" style={{ paddingTop: '24px', paddingBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div className="container-base py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
             © {new Date().getFullYear()} Boofer — All rights reserved.
           </p>

@@ -351,9 +351,9 @@ export default function UploadGamePage() {
   }
 
   return (
-    <div className="flex gap-6 max-w-7xl">
+    <div className="flex flex-col lg:flex-row gap-8 max-w-7xl">
       {/* Left side - Form */}
-      <div className="flex-1 max-w-2xl">
+      <div className="flex-1 max-w-2xl w-full">
         <div className="mb-6">
           <h1 className="text-xl font-bold text-white tracking-tight">Upload Game</h1>
           <p className="text-sm text-neutral-500 mt-0.5">Submit an HTML5 game for review on the Boofer platform.</p>
@@ -605,8 +605,8 @@ export default function UploadGamePage() {
       </div>
 
       {/* Right side - Mobile Preview */}
-      <div className="sticky top-6 h-fit">
-        <div className="mb-4">
+      <div className="lg:sticky lg:top-6 h-fit mt-6 lg:mt-0 flex flex-col items-center lg:items-start">
+        <div className="mb-4 w-full text-center lg:text-left">
           <h2 className="text-sm font-semibold text-white tracking-tight">Mobile Preview</h2>
           <p className="text-xs text-neutral-600 mt-0.5">How your game will appear in the app</p>
         </div>
