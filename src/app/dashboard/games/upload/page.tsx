@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react'
 import { getError, BooferErrorCode } from '@/lib/errors'
 import { BannerUpload } from '@/components/dashboard/BannerUpload'
+import { CoverUpload } from '@/components/dashboard/CoverUpload'
 
 const CATEGORIES = ['Puzzle', 'Action', 'Arcade', 'Adventure', 'Sports', 'Strategy', 'Casual', 'Other']
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -21,6 +22,7 @@ export default function UploadGamePage() {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
+  const [coverUrl, setCoverUrl] = useState('')
   const [keywords, setKeywords] = useState<string[]>([])
   const [keywordInput, setKeywordInput] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -322,6 +324,7 @@ export default function UploadGamePage() {
         description: description.trim() || null,
         game_url: publicUrl,
         thumbnail_url: thumbnailUrl.trim() || null,
+        cover_url: coverUrl.trim() || null,
         developer_id: dev.id,
         status: 'pending',
         api_key: dev.api_key,
@@ -540,6 +543,12 @@ export default function UploadGamePage() {
               userId={userId ?? ''}
               error={errors.thumbnail}
             />
+            <CoverUpload
+              value={coverUrl}
+              onChange={setCoverUrl}
+              userId={userId ?? ''}
+              error={errors.cover}
+            />
             
             {/* Keywords Input */}
             <div className="flex flex-col gap-1.5">
@@ -604,73 +613,109 @@ export default function UploadGamePage() {
       </form>
       </div>
 
-      {/* Right side - Mobile Preview */}
-      <div className="lg:sticky lg:top-6 h-fit mt-6 lg:mt-0 flex flex-col items-center lg:items-start">
-        <div className="mb-4 w-full text-center lg:text-left">
-          <h2 className="text-sm font-semibold text-white tracking-tight">Mobile Preview</h2>
-          <p className="text-xs text-neutral-600 mt-0.5">How your game will appear in the app</p>
-        </div>
-
-        {/* Mobile Frame */}
-        <div className="relative w-[280px] h-[560px] bg-neutral-900 border-4 border-neutral-800 rounded-[32px] shadow-2xl overflow-hidden">
-          {/* Status Bar */}
-          <div className="absolute top-0 left-0 right-0 h-8 bg-black/50 backdrop-blur-sm z-10 flex items-center justify-between px-4">
-            <span className="text-[10px] text-white font-semibold">9:41</span>
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-2.5 border border-white/40 rounded-sm relative">
-                <div className="absolute inset-0.5 bg-white rounded-[1px]" style={{ width: '80%' }} />
-              </div>
+      {/* Right side - Mobile Preview or Rule Book */}
+      <div className="lg:sticky lg:top-6 h-fit mt-6 lg:mt-0 flex flex-col items-center lg:items-start w-full lg:w-[320px]">
+        {file ? (
+          <div className="w-full flex flex-col items-center lg:items-start animate-in fade-in duration-300">
+            <div className="mb-4 w-full text-center lg:text-left">
+              <h2 className="text-sm font-semibold text-white tracking-tight">Mobile Preview</h2>
+              <p className="text-xs text-neutral-600 mt-0.5">How your game will appear in the app</p>
             </div>
-          </div>
 
-          {/* Game Header */}
-          <div className="absolute top-8 left-0 right-0 bg-black/80 backdrop-blur-sm z-10 p-3 border-b border-neutral-800">
-            <div className="flex items-start gap-2">
-              {thumbnailUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumbnailUrl} alt="Banner" className="w-12 h-12 object-cover rounded" />
-              ) : (
-                <div className="w-12 h-12 bg-neutral-800 rounded flex items-center justify-center">
-                  <FileText size={20} className="text-neutral-600" />
+            {/* Mobile Frame */}
+            <div className="relative w-[280px] h-[560px] bg-neutral-900 border-4 border-neutral-800 rounded-[32px] shadow-2xl overflow-hidden">
+              {/* Status Bar */}
+              <div className="absolute top-0 left-0 right-0 h-8 bg-black/50 backdrop-blur-sm z-10 flex items-center justify-between px-4">
+                <span className="text-[10px] text-white font-semibold">9:41</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-4 h-2.5 border border-white/40 rounded-sm relative">
+                    <div className="absolute inset-0.5 bg-white rounded-[1px]" style={{ width: '80%' }} />
+                  </div>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-white truncate">
-                  {title || 'Your Game Title'}
-                </h3>
-                <p className="text-[10px] text-neutral-500 truncate">
-                  {category || 'Category'}
-                </p>
-                {keywords.length > 0 && (
-                  <div className="flex gap-1 mt-1 overflow-hidden">
-                    {keywords.slice(0, 3).map(kw => (
-                      <span key={kw} className="text-[9px] px-1.5 py-0.5 bg-neutral-800 text-neutral-400 rounded">
-                        {kw}
-                      </span>
-                    ))}
+              </div>
+
+              {/* Game Header */}
+              <div className="absolute top-8 left-0 right-0 bg-black/80 backdrop-blur-sm z-10 p-3 border-b border-neutral-800">
+                <div className="flex items-start gap-2">
+                  {thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumbnailUrl} alt="Banner" className="w-12 h-12 object-cover rounded" />
+                  ) : (
+                    <div className="w-12 h-12 bg-neutral-800 rounded flex items-center justify-center">
+                      <FileText size={20} className="text-neutral-600" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-bold text-white truncate">
+                      {title || 'Your Game Title'}
+                    </h3>
+                    <p className="text-[10px] text-neutral-500 truncate">
+                      {category || 'Category'}
+                    </p>
+                    {keywords.length > 0 && (
+                      <div className="flex gap-1 mt-1 overflow-hidden">
+                        {keywords.slice(0, 3).map(kw => (
+                          <span key={kw} className="text-[9px] px-1.5 py-0.5 bg-neutral-800 text-neutral-400 rounded">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Game Content */}
+              <div className="absolute top-[120px] left-0 right-0 bottom-0 bg-black">
+                {previewUrl ? (
+                  <iframe
+                    src={previewUrl}
+                    className="w-full h-full border-0"
+                    title="Game preview"
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center px-6">
+                    <Upload size={32} className="text-neutral-700 mb-3" />
+                    <p className="text-xs text-neutral-600">Upload a game file to preview</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Game Content */}
-          <div className="absolute top-[120px] left-0 right-0 bottom-0 bg-black">
-            {previewUrl ? (
-              <iframe
-                src={previewUrl}
-                className="w-full h-full border-0"
-                title="Game preview"
-                sandbox="allow-scripts allow-same-origin"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-center px-6">
-                <Upload size={32} className="text-neutral-700 mb-3" />
-                <p className="text-xs text-neutral-600">Upload a game file to preview</p>
+        ) : (
+          <Card className="w-full animate-in fade-in duration-300">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                <FileText size={16} className="text-purple-400" />
+                Submission Rule Book
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 text-xs text-neutral-400 leading-relaxed">
+              <div>
+                <h4 className="font-semibold text-white mb-0.5 uppercase tracking-wider text-[10px] text-purple-300">1. Game Title</h4>
+                <p>Must be 3–80 characters. Catchy, unique, and strictly free of profanity or symbols.</p>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="border-t border-neutral-900 pt-3">
+                <h4 className="font-semibold text-white mb-0.5 uppercase tracking-wider text-[10px] text-purple-300">2. HTML File</h4>
+                <p>Single HTML5 file under 10MB. Must reference SDK relatively: <code className="text-neutral-300">{"<script src=\"boofer-sdk.js\"></script>"}</code>.</p>
+                <p className="mt-1">Must contain your developer API Key as a meta tag: <code className="text-neutral-300">{"<meta name=\"boofer-api-key\" content=\"...\">"}</code>.</p>
+              </div>
+              <div className="border-t border-neutral-900 pt-3">
+                <h4 className="font-semibold text-white mb-0.5 uppercase tracking-wider text-[10px] text-purple-300">3. Game Banner</h4>
+                <p>A square (1:1 aspect ratio) representative thumbnail image. It is auto-processed and optimized to a 512×512 WebP (≤10 KB).</p>
+              </div>
+              <div className="border-t border-neutral-900 pt-3">
+                <h4 className="font-semibold text-white mb-0.5 uppercase tracking-wider text-[10px] text-purple-300">4. Keywords & Tags</h4>
+                <p>Provide up to 10 tags. Accurate search keywords help players find your game faster in search filters.</p>
+              </div>
+              <div className="border-t border-neutral-900 pt-3">
+                <h4 className="font-semibold text-white mb-0.5 uppercase tracking-wider text-[10px] text-purple-300">5. Cover Image (16:9)</h4>
+                <p>Optional widescreen banner (960×540 WebP ≤50 KB). If your game gets featured or reaches the trending list, this cover is displayed in the Boofer App storefront top area.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

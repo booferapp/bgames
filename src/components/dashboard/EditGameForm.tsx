@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useRouter } from 'next/navigation'
 import { CheckCircle, AlertCircle } from 'lucide-react'
 import { BannerUpload } from '@/components/dashboard/BannerUpload'
+import { CoverUpload } from '@/components/dashboard/CoverUpload'
 
 const CATEGORIES = ['Puzzle', 'Action', 'Arcade', 'Adventure', 'Sports', 'Strategy', 'Casual', 'Other']
 
@@ -17,6 +18,7 @@ interface Game {
   description: string | null
   game_url: string
   thumbnail_url: string | null
+  cover_url: string | null
   category: string | null
   status: string
 }
@@ -27,6 +29,7 @@ export function EditGameForm({ game }: { game: Game }) {
   const [description, setDescription] = useState(game.description ?? '')
   const [category, setCategory] = useState(game.category ?? '')
   const [thumbnailUrl, setThumbnailUrl] = useState(game.thumbnail_url ?? '')
+  const [coverUrl, setCoverUrl] = useState(game.cover_url ?? '')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -51,6 +54,7 @@ export function EditGameForm({ game }: { game: Game }) {
         title: title.trim(),
         description: description.trim() || null,
         thumbnail_url: thumbnailUrl.trim() || null,
+        cover_url: coverUrl.trim() || null,
         category: category || null,
         status: 'pending', // Reset to pending on edit
       })
@@ -101,6 +105,11 @@ export function EditGameForm({ game }: { game: Game }) {
             <BannerUpload
               value={thumbnailUrl}
               onChange={setThumbnailUrl}
+              userId={userId ?? ''}
+            />
+            <CoverUpload
+              value={coverUrl}
+              onChange={setCoverUrl}
               userId={userId ?? ''}
             />
 
