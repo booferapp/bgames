@@ -53,7 +53,7 @@ export function DocsSidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="sticky top-16 w-52 flex-shrink-0 hidden lg:block">
+      <aside className="sticky top-20 w-64 flex-shrink-0 hidden lg:block h-[calc(100vh-5rem)] overflow-y-auto border-r border-neutral-900 pr-6 mr-6 custom-scrollbar">
         <div className="py-6">
           {sections.map((section) => (
             <div key={section.title} className="mb-5">
@@ -94,7 +94,7 @@ export function DocsSidebar() {
         </button>
 
         {isOpen && (
-          <div className="mt-2 bg-[#050505] border border-neutral-900 p-4 flex flex-col gap-4 max-h-[300px] overflow-y-auto">
+          <div className="mt-2 bg-[#050505] border border-neutral-900 p-4 flex flex-col gap-4 max-h-[200px] overflow-y-auto">
             {sections.map((section) => (
               <div key={section.title}>
                 <p className="text-[10px] font-semibold text-neutral-600 uppercase tracking-widest mb-1.5">

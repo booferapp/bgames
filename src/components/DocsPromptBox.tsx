@@ -188,7 +188,7 @@ Please design the game to be modern, responsive, and completely functional withi
         Don&apos;t want to write the SDK code yourself? Fill in your game details to generate a customized prompt. Copy and paste it into your favorite AI developer agent (like Claude, Cursor, or Antigravity) to build a fully integrated HTML5 game.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
         {/* Form Inputs */}
         <div className="space-y-4">
           <Input
@@ -225,14 +225,14 @@ Please design the game to be modern, responsive, and completely functional withi
         </div>
 
         {/* Prompt Preview & Copy */}
-        <div className="flex flex-col h-full min-h-[300px]">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Generated System Prompt</span>
+        <div className="flex flex-col h-[400px] md:h-full md:absolute md:right-0 md:top-0 md:w-[calc(50%-12px)]">
+          <div className="flex justify-between items-center mb-1.5 shrink-0">
+            <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">Generated System Prompt</span>
             <Button
               variant="secondary"
               size="sm"
               onClick={handleCopy}
-              className="flex items-center gap-1.5 py-1 px-2.5 text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 bg-neutral-950 transition-colors"
+              className="flex items-center gap-1.5 py-1 px-2.5 text-xs text-neutral-400 hover:text-white border border-neutral-800 hover:border-neutral-700 bg-neutral-950 transition-colors -my-1"
             >
               {copied ? (
                 <>
@@ -247,11 +247,18 @@ Please design the game to be modern, responsive, and completely functional withi
               )}
             </Button>
           </div>
-          <div className="flex-1 bg-[#050505] border border-neutral-900 p-4 font-mono text-xs text-neutral-400 overflow-y-auto max-h-[350px] whitespace-pre-wrap select-all">
+          <div className="flex-1 min-h-0 bg-[#050505] border border-neutral-900 p-4 font-mono text-xs text-neutral-400 overflow-y-auto whitespace-pre-wrap select-all">
             {generatedPrompt}
           </div>
         </div>
       </div>
+
+      {copied && (
+        <div className="fixed bottom-6 right-6 bg-neutral-900 border border-neutral-800 text-white px-4 py-2.5 shadow-xl z-50 flex items-center gap-2 rounded-md">
+          <Check size={16} className="text-green-500" />
+          <span className="text-sm font-medium">Prompt copied!</span>
+        </div>
+      )}
     </div>
   )
 }

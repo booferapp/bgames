@@ -1,20 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Terminal, User, Trophy, ShieldAlert, Cpu, Heart } from 'lucide-react'
 
-function CodeBlock({ code, filename }: { code: string; filename?: string }) {
-  return (
-    <div className="bg-[#0a0a0a] border border-neutral-900 mb-5 overflow-hidden">
-      {filename && (
-        <div className="px-4 py-2 border-b border-neutral-900 flex justify-between bg-[#070707]">
-          <span className="text-xs text-neutral-600 font-mono">{filename}</span>
-        </div>
-      )}
-      <pre className="px-5 py-4 overflow-x-auto text-sm text-neutral-300 font-mono">
-        <code>{code}</code>
-      </pre>
-    </div>
-  )
-}
+import { CodeBlock } from '@/components/ui/CodeBlock'
 
 export default function SdkReferencePage() {
   return (
@@ -38,9 +25,14 @@ export default function SdkReferencePage() {
           The Boofer SDK is lightweight, has zero dependencies, and doesn't store credentials or perform direct database calls. All operations are dispatched as secure messages to the Android/iOS native layer via <code>postMessage</code>.
         </p>
         <p className="text-neutral-500 text-sm leading-relaxed">
-          To integrate, embed the script relatively in your document:
+          To integrate, embed the script relatively in your document (required for final upload):
         </p>
-        <CodeBlock code={`<script src="boofer-sdk.js"></script>`} filename="index.html" />
+        <CodeBlock code={`<script src="boofer-sdk.js"></script>`} filename="index.html (Relative)" />
+        
+        <p className="text-neutral-500 text-sm leading-relaxed mt-4">
+          Alternatively, use the official CDN for rapid prototyping and AI generation:
+        </p>
+        <CodeBlock code={`<script src="https://booferapp.github.io/bgames/assets/sdk/boofer-sdk.js"></script>`} filename="index.html (CDN)" />
       </section>
 
       {/* Section 2: Lifecycle & Init */}

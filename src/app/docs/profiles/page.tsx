@@ -1,20 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, User, Award, Shield } from 'lucide-react'
 
-function CodeBlock({ code, filename }: { code: string; filename?: string }) {
-  return (
-    <div className="bg-[#0a0a0a] border border-neutral-900 mb-5 overflow-hidden">
-      {filename && (
-        <div className="px-4 py-2 border-b border-neutral-900 flex justify-between bg-[#070707]">
-          <span className="text-xs text-neutral-600 font-mono">{filename}</span>
-        </div>
-      )}
-      <pre className="px-5 py-4 overflow-x-auto text-sm text-neutral-300 font-mono">
-        <code>{code}</code>
-      </pre>
-    </div>
-  )
-}
+import { CodeBlock } from '@/components/ui/CodeBlock'
 
 export default function ProfilesPage() {
   return (

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { DocsPromptBox } from '@/components/DocsPromptBox'
+import { CodeBlock } from '@/components/ui/CodeBlock'
 
 export default function DocsPage() {
   const sections = [
@@ -27,11 +28,7 @@ export default function DocsPage() {
       {/* CDN Install */}
       <div className="mb-10">
         <h2 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Include the SDK</h2>
-        <div className="bg-[#0a0a0a] border border-neutral-900 px-5 py-4">
-          <code className="text-sm text-neutral-300 font-mono">
-            {'<script src="https://booferapp.github.io/bgames/assets/sdk/boofer-sdk.js"></script>'}
-          </code>
-        </div>
+        <CodeBlock code={'<script src="https://booferapp.github.io/bgames/assets/sdk/boofer-sdk.js"></script>'} />
         <p className="text-xs text-neutral-600 mt-2">Add this inside your game&apos;s <code className="text-neutral-500">{'<head>'}</code> tag.</p>
       </div>
 
