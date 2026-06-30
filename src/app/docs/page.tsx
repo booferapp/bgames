@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import { DocsPromptBox } from '@/components/DocsPromptBox'
 
 export default function DocsPage() {
   const sections = [
@@ -20,7 +21,6 @@ export default function DocsPage() {
         <h1 className="text-3xl font-bold text-white tracking-tight mb-4">Boofer SDK Docs</h1>
         <p className="text-neutral-500 leading-relaxed max-w-xl">
           Everything you need to build, integrate, and publish HTML5 games on the Boofer platform. The SDK is a single JavaScript file that bridges your game with the native Boofer app.
-        
         </p>
       </div>
 
@@ -34,6 +34,9 @@ export default function DocsPage() {
         </div>
         <p className="text-xs text-neutral-600 mt-2">Add this inside your game&apos;s <code className="text-neutral-500">{'<head>'}</code> tag.</p>
       </div>
+
+      {/* AI Copilot Prompt */}
+      <DocsPromptBox />
 
       {/* Sections Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
