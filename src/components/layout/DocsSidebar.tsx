@@ -53,7 +53,7 @@ export function DocsSidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="sticky top-20 w-64 flex-shrink-0 hidden lg:block h-[calc(100vh-5rem)] overflow-y-auto border-r border-neutral-900 pr-6 mr-6 custom-scrollbar">
+      <aside className="w-64 flex-shrink-0 hidden lg:block h-full overflow-y-auto border-r border-neutral-900 pr-6 mr-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="py-6">
           {sections.map((section) => (
             <div key={section.title} className="mb-5">
